@@ -40,7 +40,7 @@ const MEMORY_TOKEN_BUDGET_MIN: Record<MemoryBudgetKey, number> = {
     longTermTokenBudget: 200,
 };
 const MEMORY_TOKEN_BUDGET_STEP: Record<MemoryBudgetKey, number> = {
-    shortTermTokenBudget: 5000,
+    shortTermTokenBudget: 500,
     coreMemoryTokenBudget: 1000,
     longTermTokenBudget: 1000,
 };
