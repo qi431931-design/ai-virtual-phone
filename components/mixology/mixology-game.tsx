@@ -1174,17 +1174,25 @@ export function MixologyGame({ sessionId, onBack, onToast }: GameProps) {
                                     const mat = stack[0] ? getMixMaterial(stack[0].materialId) : null;
                                     const extra = stack.length - 1;
                                     const locked = kind === "character";
+                                    // 角色卡本局不可换，但原地编辑放行（与酒柜同一条准入线：
+                                    // 官方出厂件、导入的别人的卡不给改）。引擎每轮从酒柜实时取卡，
+                                    // 改完下一轮生效，「同一件改版全局换皮」照旧
+                                    const charEditable = locked && mat ? !isMixBuiltinId(mat.id) && !mat.imported : false;
                                     return (
                                         <div
                                             className="mix-slot"
                                             data-filled={mat ? "true" : undefined}
-                                            data-locked={locked ? "true" : undefined}
+                                            data-locked={locked && !charEditable ? "true" : undefined}
                                             key={kind}
-                                            onClick={() => { if (!locked) setSlotEdit(kind); }}
+                                            onClick={() => {
+                                                if (!locked) { setSlotEdit(kind); return; }
+                                                if (charEditable && mat) setMatEditor({ kind: "character", initial: mat });
+                                                else if (mat) onToast("官方出厂件和导入的别人的角色卡不能编辑。");
+                                            }}
                                         >
                                             <div className="mix-slot-kind">
                                                 <b>{MIX_KIND_LABELS[kind]}</b>
-                                                {locked ? <i>本局不可换</i> : <i>可留空</i>}
+                                                {locked ? <i>{charEditable ? "不可换 · 点击编辑" : "本局不可换"}</i> : <i>可留空</i>}
                                             </div>
                                             <div className="mix-slot-body">
                                                 {mat ? (
@@ -1323,6 +1331,15 @@ export function MixologyGame({ sessionId, onBack, onToast }: GameProps) {
                                         writeSlot(matEditor.slot, [...mixSlotEntries(session.recipe.slots, matEditor.slot), { materialId: material.id }]);
                                         onToast(`「${material.name}」已入柜并放进本局，下一轮生效。`);
                                     } else {
+                                        if (material.kind === "character" && material.id === mixSlotEntries(session.recipe.slots, "character")[0]?.materialId) {
+                                            // 改的是本局这张角色卡：charName 快照要对齐——生成时的
+                                            // meta 与机括钩子读的都是快照，不是酒柜里的实时卡；
+                                            // 还没开口的局顺手把开场白换成新版（refreshMixOpening 自己判）
+                                            const fresh = getMixSession(sessionId);
+                                            const nextName = material.charName.trim() || material.name;
+                                            if (fresh && nextName && nextName !== fresh.charName) saveMixSession({ ...fresh, charName: nextName });
+                                            refreshMixOpening(sessionId);
+                                        }
                                         setSession(getMixSession(sessionId));
                                         onToast(`「${material.name}」已更新，下一轮生效。`);
                                     }
