@@ -412,6 +412,11 @@ export function CalendarDetailPage({
             className="calendar-tl-hscroll hide-scrollbar"
             ref={tlHRef}
             onScroll={handleTimelineScroll}
+            onWheel={e => {
+              if (tlVRef.current && Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+                tlVRef.current.scrollTop += e.deltaY;
+              }
+            }}
             style={{ "--tl-day-w": `${100 / daysPerPage}%` } as CSSProperties}
           >
             {days.map(iso => {
