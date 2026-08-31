@@ -4461,13 +4461,13 @@ html,body{margin:0;padding:0;width:100%;height:100%;background:#121110;color:rgb
                       : "phone-workspace"
                 }
                 style={{
-                  touchAction: activeApp ? undefined : editMode ? "none" : "pan-y",
+                  touchAction: activeApp ? "manipulation" : editMode ? "none" : "pan-y",
                   ...(!desktopReady && !activeApp ? { visibility: "hidden" } : {}),
                 }}
-                onPointerDown={handleSwipeStart}
-                onPointerMove={handleSwipeMove}
-                onPointerUp={handleSwipeEnd}
-                onPointerCancel={handleSwipeEnd}
+                onPointerDown={activeApp ? undefined : handleSwipeStart}
+                onPointerMove={activeApp ? undefined : handleSwipeMove}
+                onPointerUp={activeApp ? undefined : handleSwipeEnd}
+                onPointerCancel={activeApp ? undefined : handleSwipeEnd}
               >
                 {/* Edit mode Done button */}
                 {editMode && !activeApp && (
