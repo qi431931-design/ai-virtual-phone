@@ -378,15 +378,7 @@ export function buildMenstrualDayMap(
       setDayState(result, date, { type: "predicted_period", label: "预计经期", shortLabel: "预计" });
     }
 
-    const ovulationDate = addDays(predictedStart, -14);
-    if (ovulationDate >= rangeStart && ovulationDate <= rangeEnd) {
-      setDayState(result, ovulationDate, { type: "ovulation", label: "预计排卵", shortLabel: "排卵" });
-    }
-    for (let offset = -5; offset <= 1; offset += 1) {
-      const date = addDays(ovulationDate, offset);
-      if (date < rangeStart || date > rangeEnd) continue;
-      setDayState(result, date, { type: "fertile", label: "易孕期", shortLabel: "易孕" });
-    }
+
 
     predictedStart = addDays(predictedStart, config.cycleLength);
   }
