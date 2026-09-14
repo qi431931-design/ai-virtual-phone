@@ -1837,7 +1837,7 @@ export function MediaDetailModal({ msg, userName, groupSize, onAccept, onClose }
 
 // ── Music Share Bubble ──────────────────────────
 
-function MusicShareBubble({ msg, onPlay }: { msg: ChatMessage; onPlay?: (track: any) => void }) {
+function MusicShareBubble({ msg, onPlay }: { msg: ChatMessage; onPlay?: (title: string, artist?: string) => void }) {
     const title = msg.mediaData?.musicTitle || msg.content || "未知歌曲";
     const artist = msg.mediaData?.musicArtist || "未知歌手";
     return (
@@ -1852,7 +1852,7 @@ function MusicShareBubble({ msg, onPlay }: { msg: ChatMessage; onPlay?: (track: 
                 maxWidth: 260,
             }}
             onClick={() => {
-                onPlay?.({ title, artist });
+                onPlay?.(title, artist);
             }}
         >
             <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-500/30 shadow-inner">

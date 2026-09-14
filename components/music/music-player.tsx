@@ -233,30 +233,15 @@ export default function MusicPlayer() {
     const [activeLyricIdx, setActiveLyricIdx] = useState(-1);
     const lyricsContainerRef = useRef<HTMLDivElement>(null);
 
-    // Sync Together chat on track change
+    /** Extract full clean lyrics (strip LRC timestamps, slash-joined for rhythm) */
+    const buildCleanLyrics = useCallback((raw?: string) => (raw || "")
+        .replace(/\[\d+:\d+(?:\.\d+)?\]/g, "")
+        .split("\n")
+        .map(l => l.trim())
+        .filter(Boolean)
+        .join(" / "), []);
+
     const prevTrackIdRef = useRef<string | null>(null);
-    useEffect(() => {
-        if (!togetherChar || !track || prevTrackIdRef.current === track.id) return;
-        prevTrackIdRef.current = track.id;
-        const cleanLyrics = (track.lyrics || "")
-            .replace(/\[\d+:\d+(?:\.\d+)?\]/g, "")
-            .split("\n")
-            .map(l => l.trim())
-            .filter(Boolean)
-            .join(" / ");
-        window.dispatchEvent(new CustomEvent("open-mini-chat", {
-            detail: {
-                contactId: togetherChar.id,
-                share: {
-                    type: "music",
-                    title: track.title,
-                    artist: track.artist || "未知歌手",
-                    lyrics: cleanLyrics || undefined,
-                    isTogether: true,
-                },
-            }
-        }));
-    }, [togetherChar, track]);
 
     useEffect(() => {
         const lrc = player.currentTrack?.lyrics || "";
@@ -383,6 +368,25 @@ export default function MusicPlayer() {
 
     const track = player.currentTrack;
     const waveBars = useMemo(() => waveHeights(track?.id || "lumen"), [track?.id]);
+
+    // Sync Together chat when the track changes (after `track` is declared)
+    useEffect(() => {
+        if (!togetherChar || !track) return;
+        if (prevTrackIdRef.current === track.id) return;
+        prevTrackIdRef.current = track.id;
+        window.dispatchEvent(new CustomEvent("open-mini-chat", {
+            detail: {
+                contactId: togetherChar.id,
+                share: {
+                    type: "music",
+                    title: track.title,
+                    artist: track.artist || "未知歌手",
+                    lyrics: buildCleanLyrics(track.lyrics) || undefined,
+                    isTogether: true,
+                },
+            }
+        }));
+    }, [togetherChar, track, buildCleanLyrics]);
 
     const getAdjacentTrack = (direction: "prev" | "next") => {
         if (player.queue.length === 0 || !player.currentTrack) return null;
@@ -853,6 +857,9 @@ export default function MusicPlayer() {
                                         className="music-playlist-picker-item"
                                         style={isCurrent ? { background: "rgba(255,255,255,0.1)" } : undefined}
                                         onClick={() => {
+                                            // Mark this track as already synced so the effect below
+                                            // does not fire a duplicate share for the same song.
+                                            prevTrackIdRef.current = track.id;
                                             setTogetherChar(c);
                                             setShowTogetherPicker(false);
                                             showMusicToast(`已与 ${c.name} 开启一起听`);
