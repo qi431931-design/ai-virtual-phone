@@ -233,6 +233,31 @@ export default function MusicPlayer() {
     const [activeLyricIdx, setActiveLyricIdx] = useState(-1);
     const lyricsContainerRef = useRef<HTMLDivElement>(null);
 
+    // Sync Together chat on track change
+    const prevTrackIdRef = useRef<string | null>(null);
+    useEffect(() => {
+        if (!togetherChar || !track || prevTrackIdRef.current === track.id) return;
+        prevTrackIdRef.current = track.id;
+        const cleanLyrics = (track.lyrics || "")
+            .replace(/\[\d+:\d+(?:\.\d+)?\]/g, "")
+            .split("\n")
+            .map(l => l.trim())
+            .filter(Boolean)
+            .join(" / ");
+        window.dispatchEvent(new CustomEvent("open-mini-chat", {
+            detail: {
+                contactId: togetherChar.id,
+                share: {
+                    type: "music",
+                    title: track.title,
+                    artist: track.artist || "未知歌手",
+                    lyrics: cleanLyrics || undefined,
+                    isTogether: true,
+                },
+            }
+        }));
+    }, [togetherChar, track]);
+
     useEffect(() => {
         const lrc = player.currentTrack?.lyrics || "";
         if (!lrc) {
@@ -579,7 +604,7 @@ export default function MusicPlayer() {
                                             .split("\n")
                                             .map(l => l.trim())
                                             .filter(Boolean)
-                                            .join(" ");
+                                            .join(" / ");
 
                                         // Directly open mini-chat with music payload
                                         window.dispatchEvent(new CustomEvent("open-mini-chat", {
@@ -831,13 +856,13 @@ export default function MusicPlayer() {
                                             setTogetherChar(c);
                                             setShowTogetherPicker(false);
                                             showMusicToast(`已与 ${c.name} 开启一起听`);
-                                            // Extract clean full lyrics without timestamps
+                                            // Extract clean full lyrics without timestamps (joined by slashes for readable rhythm)
                                             const cleanLyrics = (track.lyrics || "")
                                                 .replace(/\[\d+:\d+(?:\.\d+)?\]/g, "")
                                                 .split("\n")
                                                 .map(l => l.trim())
                                                 .filter(Boolean)
-                                                .join(" ");
+                                                .join(" / ");
 
                                             // Open mini chat immediately with music share payload + lyrics snippet
                                             window.dispatchEvent(new CustomEvent("open-mini-chat", {
