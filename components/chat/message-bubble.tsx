@@ -2204,34 +2204,6 @@ function MediaFileBubble({
     );
 }
 
-function MusicShareBubble({ msg, onPlay }: { msg: ChatMessage; onPlay?: (title: string, artist?: string) => void }) {
-    const title = msg.mediaData?.musicTitle || "未知歌曲";
-    const artist = msg.mediaData?.musicArtist || "";
-    return (
-        <div
-            className="chat-music-share-card"
-            style={{ cursor: "pointer" }}
-            onClick={(e) => { e.stopPropagation(); onPlay?.(title, artist || undefined); }}
-        >
-            <div className="chat-music-share-body">
-                <div className="chat-music-share-cover">
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--c-music-accent, #7c9a92)" strokeWidth="1.2">
-                        <path d="M9 18V5l12-2v13" /><circle cx="6" cy="18" r="3" /><circle cx="18" cy="16" r="3" />
-                    </svg>
-                </div>
-                <div className="chat-music-share-info">
-                    <div className="chat-music-share-title">{title}</div>
-                    {artist && <div className="chat-music-share-artist">{artist}</div>}
-                </div>
-            </div>
-            <div className="chat-music-share-footer">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M9 18V5l12-2v13" /><circle cx="6" cy="18" r="3" /><circle cx="18" cy="16" r="3" /></svg>
-                <span>音乐</span>
-            </div>
-        </div>
-    );
-}
-
 // ── Xiaohongshu Share Bubble ──────────────────────────
 
 function XiaohongshuShareBubble({ msg }: { msg: ChatMessage }) {
