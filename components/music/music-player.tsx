@@ -407,6 +407,7 @@ export default function MusicPlayer() {
             const nid = parseInt(target.id.replace("netease_", ""), 10);
             const info = await getNeteasePlayInfo(nid);
             if (!info.url) {
+                clearMusicToast();
                 showMusicToast(info.reason || "加载失败，请稍后重试", 2600);
                 return;
             }

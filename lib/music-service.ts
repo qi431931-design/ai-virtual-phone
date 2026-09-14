@@ -230,7 +230,14 @@ export async function getNeteasePlayInfo(songId: number): Promise<NeteasePlayInf
     const base = neteaseBase();
     if (!base) return { url: null, trial: false, reason: "音乐 API 未配置" };
     try {
-        const resp = await fetch(withNeteaseParams(`${base}/song/url?id=${songId}`));
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 6000);
+        let resp: Response;
+        try {
+            resp = await fetch(withNeteaseParams(`${base}/song/url?id=${songId}`), { signal: controller.signal });
+        } finally {
+            clearTimeout(timeoutId);
+        }
         const data = await resp.json();
         const d = data?.data?.[0];
         const url = d?.url;
@@ -239,6 +246,20 @@ export async function getNeteasePlayInfo(songId: number): Promise<NeteasePlayInf
             // them as mixed content, so the audio never loads. The CDN serves https.
             return { url: url.replace(/^http:\/\//, "https://"), trial: !!d?.freeTrialInfo, reason: "" };
         }
+
+        // 备用获取方式：尝试使用 song/url/v1 标准音质接口重试一次
+        try {
+            const v1Controller = new AbortController();
+            const v1TimeoutId = setTimeout(() => v1Controller.abort(), 4000);
+            const v1Resp = await fetch(withNeteaseParams(`${base}/song/url/v1?id=${songId}&level=standard`), { signal: v1Controller.signal });
+            clearTimeout(v1TimeoutId);
+            const v1Data = await v1Resp.json();
+            const v1Url = v1Data?.data?.[0]?.url;
+            if (v1Url && typeof v1Url === "string") {
+                return { url: v1Url.replace(/^http:\/\//, "https://"), trial: !!v1Data?.data?.[0]?.freeTrialInfo, reason: "" };
+            }
+        } catch { /* ignore fallback */ }
+
         const fee = d?.fee;
         const loggedIn = !!loadNeteaseCookie();
         if (fee === 1) {
@@ -249,13 +270,19 @@ export async function getNeteasePlayInfo(songId: number): Promise<NeteasePlayInf
         }
         // Ask check/music for a human-readable reason (e.g. 无版权)
         try {
-            const chk = await fetch(withNeteaseParams(`${base}/check/music?id=${songId}&timestamp=${Date.now()}`)).then(r => r.json());
+            const chkController = new AbortController();
+            const chkTimeoutId = setTimeout(() => chkController.abort(), 3000);
+            const chk = await fetch(withNeteaseParams(`${base}/check/music?id=${songId}&timestamp=${Date.now()}`), { signal: chkController.signal }).then(r => r.json());
+            clearTimeout(chkTimeoutId);
             const msg = chk?.message ? String(chk.message).replace(/^亲爱的[,，]?/, "").trim() : "";
             if (chk?.success === false && msg) return { url: null, trial: false, reason: msg };
         } catch { /* check endpoint unavailable — fall through */ }
-        return { url: null, trial: false, reason: "该歌曲暂时无法播放" };
-    } catch (e) {
+        return { url: null, trial: false, reason: "该歌曲暂时无法播放（无音源或版权受限）" };
+    } catch (e: any) {
         console.warn("[MusicService] Get play URL failed:", e);
+        if (e?.name === "AbortError") {
+            return { url: null, trial: false, reason: "音乐接口响应超时，请稍后重试" };
+        }
         return { url: null, trial: false, reason: "网络异常，加载失败" };
     }
 }

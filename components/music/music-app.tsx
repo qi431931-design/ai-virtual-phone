@@ -200,6 +200,7 @@ export default function MusicApp({ onClose }: Props) {
         beginMusicLoadingToast(trackId);
         const info = await getNeteasePlayInfo(result.id);
         if (!info.url) {
+            clearMusicToast();
             showMusicToast(info.reason || "加载失败，请稍后重试", 2600);
             return;
         }
