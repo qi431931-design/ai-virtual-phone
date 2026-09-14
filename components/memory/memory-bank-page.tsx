@@ -737,7 +737,7 @@ export function MemoryBankPage({ view, selectedCharId, onSelectChar, onNotice }:
                 </div>
 
                 {/* Bottom tab bar — floating above bottom */}
-                <div className="chat-tab-bar" style={{ position: "absolute", bottom: 40, left: 40, right: 40, zIndex: 10, borderRadius: 28, borderTop: "none", padding: "10px 0" }}>
+                <div className="chat-tab-bar overflow-x-auto no-scrollbar" style={{ position: "absolute", bottom: 20, left: 16, right: 16, zIndex: 10, borderRadius: 28, borderTop: "none", padding: "8px 12px", display: "flex", gap: 8, justifyContent: "space-between" }}>
                     {([
                         { key: "living_room" as const, icon: Archive, label: "客厅活节点" },
                         { key: "boxes" as const, icon: Brain, label: "事件盒" },
@@ -748,14 +748,15 @@ export function MemoryBankPage({ view, selectedCharId, onSelectChar, onNotice }:
                     ]).map(tab => (
                         <button
                             key={tab.key}
-                            className={`chat-tab${activeTab === tab.key ? " chat-tab-active" : ""}`}
+                            className={`chat-tab shrink-0${activeTab === tab.key ? " chat-tab-active" : ""}`}
+                            style={{ minWidth: 54, padding: "4px 8px" }}
                             onClick={() => {
                                 setActiveTab(tab.key);
                                 setEntryMenuId(null);
                             }}
                         >
-                            <tab.icon size={18} />
-                            <span>{tab.label}</span>
+                            <tab.icon size={16} />
+                            <span style={{ fontSize: 11 }}>{tab.label}</span>
                         </button>
                     ))}
                 </div>
