@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useContext, useCallback, useMemo } from "react";
-import { Plus, Upload, Download, Trash2, RotateCcw, ChevronLeft, ChevronDown, GripVertical, MessageSquare, AlertCircle, Maximize2, Copy, Replace, CheckSquare, Check, Filter } from "lucide-react";
+import { Plus, Upload, Download, Trash2, RotateCcw, ChevronLeft, ChevronDown, GripVertical, MessageSquare, AlertCircle, Maximize2, Copy, Replace, CheckSquare, Check, Filter, MoreHorizontal } from "lucide-react";
 import {
     loadPresets,
     savePresets,
@@ -10,7 +10,11 @@ import {
     resetBuiltinPreset,
     UNSUPPORTED_IMPORT_FORMAT,
 } from "@/lib/settings-storage";
-import type { PresetConfig, Prompt, PromptOrderEntry } from "@/lib/settings-types";
+import type { GenerationParameterKey, PresetConfig, Prompt, PromptOrderEntry } from "@/lib/settings-types";
+import {
+    GENERATION_PARAMETER_KEYS,
+    resolveEnabledGenerationParameters,
+} from "@/lib/generation-parameters";
 import {
     areTagsEqual,
     CONTENT_SCOPE_TAG_GROUPS,
@@ -119,6 +123,18 @@ function buildDisplayedPrompts(preset: PresetConfig): Prompt[] {
 }
 
 type AppFilterMode = "highlight" | "only-show" | "collapse" | "group-collapse";
+
+const GENERATION_PARAMETER_OPTIONS: Array<{ key: GenerationParameterKey; label: string; title: string }> = [
+    { key: "temperature", label: "Temperature", title: "Temperature" },
+    { key: "top_p", label: "Top P", title: "Top P" },
+    { key: "top_k", label: "Top K", title: "Top K" },
+    { key: "min_p", label: "Min P", title: "Min P" },
+    { key: "top_a", label: "Top A", title: "Top A" },
+    { key: "repetition_penalty", label: "重复惩罚", title: "Repetition Penalty" },
+    { key: "frequency_penalty", label: "频率惩罚", title: "Frequency Penalty" },
+    { key: "presence_penalty", label: "存在惩罚", title: "Presence Penalty" },
+    { key: "max_tokens", label: "Max Tokens", title: "Max Tokens" },
+];
 
 type PromptRenderItem =
     | { type: "item"; prompt: Prompt }
@@ -275,6 +291,7 @@ export function PresetManager({ isActive = true }: { isActive?: boolean } = {}) 
     const [confirmDeleteEntry, setConfirmDeleteEntry] = useState<string | null>(null);
     const [isLoaded, setIsLoaded] = useState(false);
     const [paramsOpen, setParamsOpen] = useState(false);
+    const [parameterPickerOpen, setParameterPickerOpen] = useState(false);
     const [expandTarget, setExpandTarget] = useState<{ identifier: string; field: string } | null>(null);
     const [importError, setImportError] = useState<string | null>(null);
     const [customApps, setCustomApps] = useState<InstalledCustomApp[]>([]);
@@ -360,6 +377,7 @@ export function PresetManager({ isActive = true }: { isActive?: boolean } = {}) 
         setSelectedIds(new Set());
         setSelectionPresetId(null);
         setConfirmDeleteSelected(false);
+        setParameterPickerOpen(false);
     }, [editingId, viewMode]);
 
     useEffect(() => {
@@ -518,6 +536,7 @@ export function PresetManager({ isActive = true }: { isActive?: boolean } = {}) 
                             });
                         }
                         const prompt = { ...prompts[promptIdx] };
+                        const previousIdentifier = prompt.identifier;
                         if (subfield === "identifier") {
                             prompt.identifier = value;
                             handled = true;
@@ -566,8 +585,24 @@ export function PresetManager({ isActive = true }: { isActive?: boolean } = {}) 
                         for (let pi = 0; pi < prompts.length; pi++) {
                             prompts[pi] = { ...prompts[pi], system_prompt: pi === firstSystemIdx };
                         }
-                        // Auto-generate prompt_order from array order
-                        preset.prompt_order = prompts.filter(p => p.identifier && !p.identifier.startsWith("_placeholder")).map(p => ({ identifier: p.identifier, enabled: true }));
+                        // 顺序表保留现有顺序与开关：被改名的条目映射到新 identifier，新条目追加到
+                        // 末尾，已不存在或仍是占位符的剔除。不能按数组顺序重建，否则用户拖好的顺序
+                        // 会被打回创建顺序，开关状态也会全部变成开启。
+                        const validIds = new Set(prompts.filter(p => p.identifier && !p.identifier.startsWith("_placeholder")).map(p => p.identifier));
+                        const seenIds = new Set<string>();
+                        const nextOrder: PromptOrderEntry[] = [];
+                        for (const entry of preset.prompt_order ?? []) {
+                            const id = entry.identifier === previousIdentifier ? prompt.identifier : entry.identifier;
+                            if (!validIds.has(id) || seenIds.has(id)) continue;
+                            seenIds.add(id);
+                            nextOrder.push({ identifier: id, enabled: entry.enabled !== false });
+                        }
+                        for (const p of prompts) {
+                            if (!validIds.has(p.identifier) || seenIds.has(p.identifier)) continue;
+                            seenIds.add(p.identifier);
+                            nextOrder.push({ identifier: p.identifier, enabled: true });
+                        }
+                        preset.prompt_order = nextOrder;
                     }
                 }
 
@@ -642,6 +677,23 @@ export function PresetManager({ isActive = true }: { isActive?: boolean } = {}) 
 
     const updatePreset = (id: string, updates: Partial<PresetConfig>) => {
         persist(presets.map(p => p.id === id ? { ...p, ...updates, updatedAt: Date.now() } : p));
+    };
+
+    const toggleGenerationParameter = (preset: PresetConfig, key: GenerationParameterKey) => {
+        const enabled = resolveEnabledGenerationParameters(preset);
+        const willEnable = !enabled.has(key);
+        if (willEnable) enabled.add(key);
+        else enabled.delete(key);
+
+        const updates: Partial<PresetConfig> = {
+            enabled_generation_parameters: GENERATION_PARAMETER_KEYS.filter(item => enabled.has(item)),
+        };
+        // 0 在 Max Tokens 中表示“不发送”。用户主动开启时给一个可用值，
+        // 避免胶囊显示已选、请求里却仍然没有该字段。
+        if (key === "max_tokens" && willEnable && preset.openai_max_tokens <= 0) {
+            updates.openai_max_tokens = 4096;
+        }
+        updatePreset(preset.id, updates);
     };
 
     const updatePrompt = (
@@ -877,14 +929,18 @@ export function PresetManager({ isActive = true }: { isActive?: boolean } = {}) 
             injection_depth: 0,
             enabled: true,
         };
-        const newPrompts = [...(preset.prompts || []), newPrompt];
-        const newOrder = newPrompts.map(p => ({
+        // 顺序表以当前显示顺序为基础追加，不能按 prompts 数组重建：拖动排序只改
+        // prompt_order、不动数组，按数组重建会把用户拖好的顺序打回创建顺序。
+        const displayed = buildDisplayedPrompts(preset);
+        const newOrder = [...displayed, newPrompt].map(p => ({
             identifier: p.identifier,
-            enabled: preset.prompt_order
-                ? (preset.prompt_order.find(o => o.identifier === p.identifier)?.enabled ?? p.enabled)
-                : p.enabled,
+            enabled: p.identifier === newPrompt.identifier
+                ? true
+                : (preset.prompt_order
+                    ? (preset.prompt_order.find(o => o.identifier === p.identifier)?.enabled ?? p.enabled)
+                    : p.enabled),
         }));
-        updatePreset(preset.id, { prompts: newPrompts, prompt_order: newOrder });
+        updatePreset(preset.id, { prompts: [...(preset.prompts || []), newPrompt], prompt_order: newOrder });
     };
 
     const appendImportedPrompts = (preset: PresetConfig, raws: unknown[]) => {
@@ -905,11 +961,15 @@ export function PresetManager({ isActive = true }: { isActive?: boolean } = {}) 
             return { ...p, identifier: id };
         });
         const newPrompts = [...(preset.prompts || []), ...appended];
-        const newOrder = newPrompts.map(p => ({
+        // 同 createPromptAtEnd：以显示顺序为基础追加，保住用户拖好的顺序
+        const appendedIds = new Set(appended.map(p => p.identifier));
+        const newOrder = [...buildDisplayedPrompts(preset), ...appended].map(p => ({
             identifier: p.identifier,
-            enabled: preset.prompt_order
-                ? (preset.prompt_order.find(o => o.identifier === p.identifier)?.enabled ?? p.enabled)
-                : p.enabled,
+            enabled: appendedIds.has(p.identifier)
+                ? p.enabled
+                : (preset.prompt_order
+                    ? (preset.prompt_order.find(o => o.identifier === p.identifier)?.enabled ?? p.enabled)
+                    : p.enabled),
         }));
         updatePreset(preset.id, { prompts: newPrompts, prompt_order: newOrder });
         if (appended.length === 1) setEditingPromptId(appended[0].identifier);
@@ -1077,6 +1137,7 @@ export function PresetManager({ isActive = true }: { isActive?: boolean } = {}) 
                 <>
                     {presets.map(preset => {
                         if (preset.id !== editingId) return null;
+                        const enabledGenerationParameters = resolveEnabledGenerationParameters(preset);
                         return (
                             <div key={preset.id} className="flex flex-col gap-4 pb-[24px]">
                                 <div className="flex justify-center gap-2">
@@ -1153,113 +1214,127 @@ export function PresetManager({ isActive = true }: { isActive?: boolean } = {}) 
                                                 data-open={paramsOpen}
                                             >
                                                 <span className="menu-label ts-13 font-semibold">生成参数</span>
-                                                <ChevronDown size={16} className="text-[var(--c-text)]" style={{ transition: "transform 0.2s", transform: paramsOpen ? "rotate(180deg)" : "rotate(0deg)" }} />
+                                                <div className="generation-parameter-header-actions">
+                                                    <button
+                                                        type="button"
+                                                        className="generation-parameter-picker-btn"
+                                                        aria-label="选择发送的生成参数"
+                                                        title="选择发送的生成参数"
+                                                        onClick={(event) => {
+                                                            event.stopPropagation();
+                                                            setParameterPickerOpen(true);
+                                                        }}
+                                                    >
+                                                        <MoreHorizontal size={18} />
+                                                    </button>
+                                                    <ChevronDown size={16} className="text-[var(--c-text)]" style={{ transition: "transform 0.2s", transform: paramsOpen ? "rotate(180deg)" : "rotate(0deg)" }} />
+                                                </div>
                                             </div>
                                             {paramsOpen && (
                                                 <div className="p-[14px]">
                                                     <div className="grid grid-cols-2 gap-3">
-                                                        <div className="flex flex-col gap-1">
+                                                        <div className="generation-parameter-control flex flex-col gap-1" data-disabled={enabledGenerationParameters.has("temperature") ? undefined : ""}>
                                                             <div className="flex justify-between">
                                                                 <label className="ui-slider-label">Temperature</label>
                                                                 <span className="ui-slider-value">{preset.temperature.toFixed(2)}</span>
                                                             </div>
-                                                            <input className="ui-slider" type="range" min="0" max="2" step="any" value={preset.temperature} onChange={(e) => updatePreset(preset.id, { temperature: Math.round(parseFloat(e.target.value) * 100) / 100 })} />
+                                                            <input className="ui-slider" type="range" min="0" max="2" step="any" value={preset.temperature} disabled={!enabledGenerationParameters.has("temperature")} onChange={(e) => updatePreset(preset.id, { temperature: Math.round(parseFloat(e.target.value) * 100) / 100 })} />
                                                             <div className="ui-slider-hints">
                                                                 <span className="ui-slider-hint">稳定保守</span>
                                                                 <span className="ui-slider-hint">发散创造</span>
                                                             </div>
                                                         </div>
 
-                                                        <div className="flex flex-col gap-1">
+                                                        <div className="generation-parameter-control flex flex-col gap-1" data-disabled={enabledGenerationParameters.has("top_p") ? undefined : ""}>
                                                             <div className="flex justify-between">
                                                                 <label className="ui-slider-label">Top P</label>
                                                                 <span className="ui-slider-value">{preset.top_p.toFixed(2)}</span>
                                                             </div>
-                                                            <input className="ui-slider" type="range" min="0" max="1" step="any" value={preset.top_p} onChange={(e) => updatePreset(preset.id, { top_p: Math.round(parseFloat(e.target.value) * 100) / 100 })} />
+                                                            <input className="ui-slider" type="range" min="0" max="1" step="any" value={preset.top_p} disabled={!enabledGenerationParameters.has("top_p")} onChange={(e) => updatePreset(preset.id, { top_p: Math.round(parseFloat(e.target.value) * 100) / 100 })} />
                                                             <div className="ui-slider-hints">
                                                                 <span className="ui-slider-hint">用词精准</span>
                                                                 <span className="ui-slider-hint">词汇丰富</span>
                                                             </div>
                                                         </div>
 
-                                                        <div className="flex flex-col gap-1">
+                                                        <div className="generation-parameter-control flex flex-col gap-1" data-disabled={enabledGenerationParameters.has("top_k") ? undefined : ""}>
                                                             <div className="flex justify-between">
                                                                 <label className="ui-slider-label">Top K</label>
                                                                 <span className="ui-slider-value">{preset.top_k}</span>
                                                             </div>
-                                                            <input className="ui-slider" type="range" min="0" max="100" step="1" value={preset.top_k} onChange={(e) => updatePreset(preset.id, { top_k: parseInt(e.target.value) })} />
+                                                            <input className="ui-slider" type="range" min="0" max="100" step="1" value={preset.top_k} disabled={!enabledGenerationParameters.has("top_k")} onChange={(e) => updatePreset(preset.id, { top_k: parseInt(e.target.value) })} />
                                                             <div className="ui-slider-hints">
                                                                 <span className="ui-slider-hint">用词精准</span>
                                                                 <span className="ui-slider-hint">词汇丰富</span>
                                                             </div>
                                                         </div>
 
-                                                        <div className="flex flex-col gap-1">
+                                                        <div className="generation-parameter-control flex flex-col gap-1" data-disabled={enabledGenerationParameters.has("min_p") ? undefined : ""}>
                                                             <div className="flex justify-between">
                                                                 <label className="ui-slider-label">Min P</label>
                                                                 <span className="ui-slider-value">{(preset.min_p || 0).toFixed(2)}</span>
                                                             </div>
-                                                            <input className="ui-slider" type="range" min="0" max="1" step="any" value={preset.min_p || 0} onChange={(e) => updatePreset(preset.id, { min_p: Math.round(parseFloat(e.target.value) * 100) / 100 })} />
+                                                            <input className="ui-slider" type="range" min="0" max="1" step="any" value={preset.min_p || 0} disabled={!enabledGenerationParameters.has("min_p")} onChange={(e) => updatePreset(preset.id, { min_p: Math.round(parseFloat(e.target.value) * 100) / 100 })} />
                                                             <div className="ui-slider-hints">
                                                                 <span className="ui-slider-hint">发散跳跃</span>
                                                                 <span className="ui-slider-hint">逻辑连贯</span>
                                                             </div>
                                                         </div>
 
-                                                        <div className="flex flex-col gap-1">
+                                                        <div className="generation-parameter-control flex flex-col gap-1" data-disabled={enabledGenerationParameters.has("top_a") ? undefined : ""}>
                                                             <div className="flex justify-between">
                                                                 <label className="ui-slider-label">Top A</label>
                                                                 <span className="ui-slider-value">{(preset.top_a || 0).toFixed(2)}</span>
                                                             </div>
-                                                            <input className="ui-slider" type="range" min="0" max="1" step="any" value={preset.top_a || 0} onChange={(e) => updatePreset(preset.id, { top_a: Math.round(parseFloat(e.target.value) * 100) / 100 })} />
+                                                            <input className="ui-slider" type="range" min="0" max="1" step="any" value={preset.top_a || 0} disabled={!enabledGenerationParameters.has("top_a")} onChange={(e) => updatePreset(preset.id, { top_a: Math.round(parseFloat(e.target.value) * 100) / 100 })} />
                                                             <div className="ui-slider-hints">
                                                                 <span className="ui-slider-hint">自由发散</span>
                                                                 <span className="ui-slider-hint">限制胡言乱语</span>
                                                             </div>
                                                         </div>
 
-                                                        <div className="flex flex-col gap-1">
+                                                        <div className="generation-parameter-control flex flex-col gap-1" data-disabled={enabledGenerationParameters.has("repetition_penalty") ? undefined : ""}>
                                                             <div className="flex justify-between">
                                                                 <label className="ui-slider-label">Repetition Penalty</label>
                                                                 <span className="ui-slider-value">{preset.repetition_penalty.toFixed(2)}</span>
                                                             </div>
-                                                            <input className="ui-slider" type="range" min="1" max="2" step="any" value={preset.repetition_penalty} onChange={(e) => updatePreset(preset.id, { repetition_penalty: Math.round(parseFloat(e.target.value) * 100) / 100 })} />
+                                                            <input className="ui-slider" type="range" min="1" max="2" step="any" value={preset.repetition_penalty} disabled={!enabledGenerationParameters.has("repetition_penalty")} onChange={(e) => updatePreset(preset.id, { repetition_penalty: Math.round(parseFloat(e.target.value) * 100) / 100 })} />
                                                             <div className="ui-slider-hints">
                                                                 <span className="ui-slider-hint">允许重复</span>
                                                                 <span className="ui-slider-hint">极力惩罚重复</span>
                                                             </div>
                                                         </div>
 
-                                                        <div className="flex flex-col gap-1">
+                                                        <div className="generation-parameter-control flex flex-col gap-1" data-disabled={enabledGenerationParameters.has("frequency_penalty") ? undefined : ""}>
                                                             <div className="flex justify-between">
                                                                 <label className="ui-slider-label">Frequency Penalty</label>
                                                                 <span className="ui-slider-value">{preset.frequency_penalty.toFixed(2)}</span>
                                                             </div>
-                                                            <input className="ui-slider" type="range" min="0" max="2" step="any" value={preset.frequency_penalty} onChange={(e) => updatePreset(preset.id, { frequency_penalty: Math.round(parseFloat(e.target.value) * 100) / 100 })} />
+                                                            <input className="ui-slider" type="range" min="0" max="2" step="any" value={preset.frequency_penalty} disabled={!enabledGenerationParameters.has("frequency_penalty")} onChange={(e) => updatePreset(preset.id, { frequency_penalty: Math.round(parseFloat(e.target.value) * 100) / 100 })} />
                                                             <div className="ui-slider-hints">
                                                                 <span className="ui-slider-hint">自然口癖</span>
                                                                 <span className="ui-slider-hint">杜绝车轱辘话</span>
                                                             </div>
                                                         </div>
 
-                                                        <div className="flex flex-col gap-1">
+                                                        <div className="generation-parameter-control flex flex-col gap-1" data-disabled={enabledGenerationParameters.has("presence_penalty") ? undefined : ""}>
                                                             <div className="flex justify-between">
                                                                 <label className="ui-slider-label">Presence Penalty</label>
                                                                 <span className="ui-slider-value">{preset.presence_penalty.toFixed(2)}</span>
                                                             </div>
-                                                            <input className="ui-slider" type="range" min="0" max="2" step="any" value={preset.presence_penalty} onChange={(e) => updatePreset(preset.id, { presence_penalty: Math.round(parseFloat(e.target.value) * 100) / 100 })} />
+                                                            <input className="ui-slider" type="range" min="0" max="2" step="any" value={preset.presence_penalty} disabled={!enabledGenerationParameters.has("presence_penalty")} onChange={(e) => updatePreset(preset.id, { presence_penalty: Math.round(parseFloat(e.target.value) * 100) / 100 })} />
                                                             <div className="ui-slider-hints">
                                                                 <span className="ui-slider-hint">聚焦当前话题</span>
                                                                 <span className="ui-slider-hint">积极拓展新话题</span>
                                                             </div>
                                                         </div>
 
-                                                        <div className="flex flex-col gap-1 col-span-full">
+                                                        <div className="generation-parameter-control flex flex-col gap-1 col-span-full" data-disabled={enabledGenerationParameters.has("max_tokens") ? undefined : ""}>
                                                             <div className="flex justify-between">
                                                                 <label className="ui-slider-label">Max Tokens</label>
                                                                 <span className="ui-slider-value">{preset.openai_max_tokens || "自动"}</span>
                                                             </div>
-                                                            <input className="ui-slider" type="range" min="0" max="8192" step="128" value={preset.openai_max_tokens} onChange={(e) => updatePreset(preset.id, { openai_max_tokens: parseInt(e.target.value) })} />
+                                                            <input className="ui-slider" type="range" min="0" max="8192" step="128" value={preset.openai_max_tokens} disabled={!enabledGenerationParameters.has("max_tokens")} onChange={(e) => updatePreset(preset.id, { openai_max_tokens: parseInt(e.target.value) })} />
                                                             <div className="ui-slider-hints">
                                                                 <span className="ui-slider-hint">自动 (推荐)</span>
                                                                 <span className="ui-slider-hint">限制回复长度</span>
@@ -1988,6 +2063,37 @@ export function PresetManager({ isActive = true }: { isActive?: boolean } = {}) 
                     </BottomSheet>
                 );
             })()}
+
+            {parameterPickerOpen && activePreset && (
+                <BottomSheet title="选择发送的参数" onClose={() => setParameterPickerOpen(false)}>
+                    <div className="generation-parameter-picker">
+                        <p className="menu-desc generation-parameter-picker-desc">
+                            高亮参数允许随请求发送；未选择的参数会从请求中移除，并在设置中置灰。接口不适用的参数会自动忽略。
+                        </p>
+                        <div className="generation-parameter-chips" role="group" aria-label="选择发送的生成参数">
+                            {GENERATION_PARAMETER_OPTIONS.map(option => {
+                                const selected = resolveEnabledGenerationParameters(activePreset).has(option.key);
+                                return (
+                                    <button
+                                        key={option.key}
+                                        type="button"
+                                        className="generation-parameter-chip"
+                                        data-selected={selected ? "" : undefined}
+                                        aria-pressed={selected}
+                                        title={option.title}
+                                        onClick={() => toggleGenerationParameter(activePreset, option.key)}
+                                    >
+                                        {option.label}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                        <p className="ui-slider-hint generation-parameter-picker-note">
+                            原生 Anthropic 接口要求 Max Tokens 必须存在；关闭后仍会使用安全默认值，其余接口会正常省略。
+                        </p>
+                    </div>
+                </BottomSheet>
+            )}
 
             {expandTarget && editingId && (() => {
                 const preset = presets.find(p => p.id === editingId);
