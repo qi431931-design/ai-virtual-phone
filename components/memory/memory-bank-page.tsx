@@ -31,7 +31,7 @@ import { generateEmbedding, resolveEmbeddingModel } from "@/lib/memory-embedding
 import { BINDING_ACCENTS } from "@/lib/ui-accent-colors";
 
 type MemoryView = "list" | "detail" | "settings";
-type MemoryTab = "living_room" | "boxes" | "attic" | "short" | "core";
+type MemoryTab = "palace" | "short" | "core";
 type MemoryBudgetKey = "shortTermTokenBudget" | "coreMemoryTokenBudget" | "longTermTokenBudget";
 
 const MEMORY_TOKEN_BUDGET_MAX = 100000;
@@ -187,7 +187,7 @@ type Props = {
 export function MemoryBankPage({ view, selectedCharId, onSelectChar, onNotice }: Props) {
     const [config, setConfig] = useState<MemoryConfig>(loadMemoryConfig);
     const [characters, setCharacters] = useState<CharacterMemoryInfo[]>([]);
-    const [activeTab, setActiveTab] = useState<MemoryTab>("living_room");
+    const [activeTab, setActiveTab] = useState<MemoryTab>("palace");
     const [coreEntries, setCoreEntries] = useState<MemoryEntry[]>([]);
     const [longTermEntries, setLongTermEntries] = useState<MemoryEntry[]>([]);
     const [eventBoxes, setEventBoxes] = useState<EventBox[]>([]);
@@ -686,41 +686,46 @@ export function MemoryBankPage({ view, selectedCharId, onSelectChar, onNotice }:
                             加载中...
                         </p>
                     ) : activeTab === "short" ? (
-                        /* ── Short-term & Shared: unified timeline ── */
+                        /* ── Short-term & Shared: unified timeline with delete ── */
                         <>
                             <MemoryTimeline
                                 events={[...shortTermEvents, ...sharedEvents].sort((a, b) => (b.timestamp || "").localeCompare(a.timestamp || ""))}
                                 userName={resolveUserIdentity(selectedCharId!)?.name || "用户"}
+                                characterId={selectedCharId}
+                                onEntryDeleted={() => {
+                                    if (selectedCharId) {
+                                        loadDetailData(selectedCharId);
+                                        loadCharacterList();
+                                    }
+                                }}
                             />
                         </>
-                    ) : activeTab === "living_room" ? (
-                        /* ── SullyOS Living Room (Active) ── */
-                        renderMemoryEntries("long_term", longTermEntries.filter(e => e.room !== "attic"), "客厅暂无活节点。聊天提炼的长期记忆会优先入驻客厅。")
-                    ) : activeTab === "attic" ? (
-                        /* ── SullyOS Attic (Cold Archive) ── */
-                        renderMemoryEntries("long_term", longTermEntries.filter(e => e.room === "attic"), "阁楼暂无冷沉淀记忆。客厅超过上限后会自动衰减流转到阁楼。")
-                    ) : activeTab === "boxes" ? (
-                        /* ── SullyOS EventBox Tab ── */
-                        eventBoxes.length === 0 ? (
-                            <p className="text-center ts-14 text-secondary mt-10">暂无事件盒。长期记忆提炼时会自动归拢聚合。</p>
-                        ) : (
-                            <div className="flex flex-col gap-3 pb-24">
-                                {eventBoxes.map(box => (
-                                    <div key={box.id} className="card-surface p-4 rounded-2xl flex flex-col gap-2">
-                                        <div className="flex items-center justify-between">
-                                            <span className="font-medium ts-15 text-primary flex items-center gap-2">
-                                                {box.title}
-                                                <span className={`ts-11 px-2 py-0.5 rounded-full ${box.status === "sealed" ? "bg-secondary text-muted" : "bg-primary text-white"}`}>
-                                                    {box.status === "sealed" ? "已封盒" : "活跃中"}
-                                                </span>
-                                            </span>
-                                            <span className="ts-12 text-secondary">{box.eventCount} 条事件</span>
-                                        </div>
-                                        <p className="ts-13 text-secondary leading-relaxed line-clamp-3">{box.summary}</p>
+                    ) : activeTab === "palace" ? (
+                        /* ── Unified Palace: Long-term + EventBoxes inline ── */
+                        <div className="flex flex-col gap-3 pb-24">
+                            {eventBoxes.length > 0 && (
+                                <div className="flex flex-col gap-2 p-3 rounded-2xl bg-black/[0.03] dark:bg-white/[0.03] border border-black/5 dark:border-white/5">
+                                    <div className="flex items-center justify-between text-xs font-bold text-secondary px-1">
+                                        <span>📦 已聚合事件箱 ({eventBoxes.length})</span>
                                     </div>
-                                ))}
-                            </div>
-                        )
+                                    <div className="grid grid-cols-1 gap-2">
+                                        {eventBoxes.map(box => (
+                                            <div key={box.id} className="p-2.5 rounded-xl bg-white/60 dark:bg-neutral-800/60 flex flex-col gap-1 border border-black/5">
+                                                <div className="flex items-center justify-between">
+                                                    <span className="ts-13 font-medium text-primary flex items-center gap-1.5">
+                                                        <span>{box.status === "sealed" ? "🔒" : "📦"}</span>
+                                                        <span>{box.title}</span>
+                                                    </span>
+                                                    <span className="ts-10 px-1.5 py-0.5 rounded bg-black/5 text-secondary">{box.eventCount} 条</span>
+                                                </div>
+                                                <p className="ts-11 text-secondary line-clamp-2 leading-relaxed">{box.summary || "暂无摘要"}</p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                            {renderMemoryEntries("long_term", longTermEntries, "暂无长期记忆。聊天或日常互动会自动沉淀。")}
+                        </div>
                     ) : activeTab === "core" ? (
                         renderMemoryEntries("core", coreEntries, "暂无核心记忆。长期记忆累计到设定条数后会自动提炼，也可以手动新增。")
                     ) : (
@@ -729,26 +734,24 @@ export function MemoryBankPage({ view, selectedCharId, onSelectChar, onNotice }:
                     </MemoryDetailBoundary>
                 </div>
 
-                {/* Bottom tab bar — floating above bottom */}
-                <div className="chat-tab-bar overflow-x-auto no-scrollbar" style={{ position: "absolute", bottom: 20, left: 16, right: 16, zIndex: 10, borderRadius: 28, borderTop: "none", padding: "8px 12px", display: "flex", gap: 8, justifyContent: "space-between" }}>
+                {/* Bottom tab bar — 3 unified tiers */}
+                <div className="chat-tab-bar overflow-x-auto no-scrollbar" style={{ position: "absolute", bottom: 20, left: 16, right: 16, zIndex: 10, borderRadius: 28, borderTop: "none", padding: "8px 12px", display: "flex", gap: 8, justifyContent: "space-around" }}>
                     {([
-                        { key: "living_room" as const, icon: Archive, label: "长期记忆 (客厅)" },
-                        { key: "boxes" as const, icon: Brain, label: "事件盒" },
-                        { key: "attic" as const, icon: Archive, label: "冷归档 (阁楼)" },
+                        { key: "palace" as const, icon: Archive, label: "长期记忆" },
                         { key: "short" as const, icon: Clock, label: "短期事件" },
-                        { key: "core" as const, icon: Archive, label: "核心记忆" },
+                        { key: "core" as const, icon: Brain, label: "核心记忆" },
                     ]).map(tab => (
                         <button
                             key={tab.key}
-                            className={`chat-tab shrink-0${activeTab === tab.key ? " chat-tab-active" : ""}`}
-                            style={{ minWidth: 54, padding: "4px 8px" }}
+                            className={`chat-tab shrink-0 flex-1${activeTab === tab.key ? " chat-tab-active" : ""}`}
+                            style={{ padding: "6px 12px", justifyContent: "center" }}
                             onClick={() => {
                                 setActiveTab(tab.key);
                                 setEntryMenuId(null);
                             }}
                         >
                             <tab.icon size={16} />
-                            <span style={{ fontSize: 11 }}>{tab.label}</span>
+                            <span style={{ fontSize: 12, fontWeight: activeTab === tab.key ? "bold" : "normal" }}>{tab.label}</span>
                         </button>
                     ))}
                 </div>

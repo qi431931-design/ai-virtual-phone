@@ -5,6 +5,8 @@ import type { NativeTimelineEntry } from "@/lib/short-term-assembler";
 import { buildTwoLevelMomentThreads } from "@/lib/moments-comment-threading";
 import { findStickerByName } from "@/lib/sticker-data";
 import { getChatImageFromIndexedDB } from "@/lib/chat-asset-storage";
+import { Trash2 } from "lucide-react";
+import { deleteNativeTimelineEntry } from "@/lib/short-term-deleter";
 
 /* ================================================================
    Parsed types — structured data extracted from pre-formatted content
@@ -425,7 +427,33 @@ function formatClusterDate(cluster: TimelineCluster): string {
    Inline detail — renders the former modal content inside cards
    ================================================================ */
 
-function ClusterDetail({ cluster }: { cluster: TimelineCluster }) {
+function ClusterDetail({
+    cluster,
+    rawEventsMap,
+    characterId,
+    onEntryDeleted,
+}: {
+    cluster: TimelineCluster;
+    rawEventsMap: Map<string, NativeTimelineEntry>;
+    characterId?: string;
+    onEntryDeleted?: () => void;
+}) {
+    const [deletingId, setDeletingId] = useState<string | null>(null);
+
+    const handleDelete = async (e: React.MouseEvent, entryId: string) => {
+        e.stopPropagation();
+        const raw = rawEventsMap.get(entryId);
+        if (!raw || !characterId) return;
+        if (!confirm("确定删除这条短期记忆事件吗？")) return;
+        setDeletingId(entryId);
+        const res = await deleteNativeTimelineEntry(raw, characterId);
+        setDeletingId(null);
+        if (res.success) {
+            onEntryDeleted?.();
+        } else {
+            alert(res.error || "删除失败");
+        }
+    };
     return (
         <div className="mem-tl-card-detail" onClick={(event) => event.stopPropagation()}>
             {(() => {
@@ -492,11 +520,24 @@ function ClusterDetail({ cluster }: { cluster: TimelineCluster }) {
                                         );
                                     }
                                     return (
-                                        <div key={e.id} className={`mem-tl-bubble ${e.isUser ? "mem-tl-bubble-r" : "mem-tl-bubble-l"}`}>
-                                            <span className="mem-tl-bubble-name">
-                                                {e.sender}
-                                                {e.type === "group" && <span className="mem-tl-bubble-group">{e.groupName}</span>}
-                                                <span className="mem-tl-bubble-ts">{fmtTime(e.timestamp)}</span>
+                                        <div key={e.id} className={`mem-tl-bubble ${e.isUser ? "mem-tl-bubble-r" : "mem-tl-bubble-l"} group relative`}>
+                                            <span className="mem-tl-bubble-name flex items-center justify-between gap-1">
+                                                <span>
+                                                    {e.sender}
+                                                    {e.type === "group" && <span className="mem-tl-bubble-group">{e.groupName}</span>}
+                                                    <span className="mem-tl-bubble-ts" style={{ marginLeft: 6 }}>{fmtTime(e.timestamp)}</span>
+                                                </span>
+                                                {characterId && rawEventsMap.has(e.id) && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={(evt) => handleDelete(evt, e.id)}
+                                                        disabled={deletingId === e.id}
+                                                        className="text-red-400 hover:text-red-500 opacity-0 group-hover:opacity-100 hover:opacity-100 p-0.5 transition-all"
+                                                        title="删除此条事件"
+                                                    >
+                                                        <Trash2 size={12} />
+                                                    </button>
+                                                )}
                                             </span>
                                             <div className="mem-tl-bubble-body">
                                                 <p className="mem-tl-bubble-text">{renderWithStickers(e.message)}</p>
@@ -598,14 +639,22 @@ function ClusterDetail({ cluster }: { cluster: TimelineCluster }) {
 type Props = {
     events: NativeTimelineEntry[];
     userName: string;
+    characterId?: string;
+    onEntryDeleted?: () => void;
 };
 
 // 每批渲染的簇数：全部一次性渲染会在重数据账号上把 DOM 撑爆
 const CLUSTER_PAGE_SIZE = 30;
 
-export function MemoryTimeline({ events, userName }: Props) {
+export function MemoryTimeline({ events, userName, characterId, onEntryDeleted }: Props) {
     const [expandedClusterId, setExpandedClusterId] = useState<string | null>(null);
     const [visibleCount, setVisibleCount] = useState(CLUSTER_PAGE_SIZE);
+
+    const rawEventsMap = useMemo(() => {
+        const map = new Map<string, NativeTimelineEntry>();
+        for (const e of events) map.set(e.id, e);
+        return map;
+    }, [events]);
 
     const clusters = useMemo(() => {
         const parsed = events.map(e => parseEntry(e, userName)).filter((e): e is ParsedEntry => e !== null);
@@ -652,7 +701,12 @@ export function MemoryTimeline({ events, userName }: Props) {
                                 <span className="mem-tl-card-count">{cluster.entryCount} 条记录</span>
                             </div>
                             {expanded ? (
-                                <ClusterDetail cluster={cluster} />
+                                <ClusterDetail
+                                    cluster={cluster}
+                                    rawEventsMap={rawEventsMap}
+                                    characterId={characterId}
+                                    onEntryDeleted={onEntryDeleted}
+                                />
                             ) : (
                                 <div className="mem-tl-card-excerpts">
                                     {cluster.excerpts.length > 0 ? cluster.excerpts.map((ex, i) => (

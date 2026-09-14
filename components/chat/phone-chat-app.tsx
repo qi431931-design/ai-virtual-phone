@@ -73,10 +73,10 @@ export const PhoneChatApp = memo(function PhoneChatApp({ onClose, initialSession
         if (!sharePayload) return;
         if (sharePayload.type === "music") {
             const lyricsSnippet = sharePayload.lyrics?.trim()
-                ? `\n歌词：${sharePayload.lyrics.trim()}（自然陪伴，勿刻意解读）`
+                ? `\n【背景正在播放此歌曲】\n歌词参考：${sharePayload.lyrics.trim()}`
                 : "";
             const content = sharePayload.isTogether
-                ? `[一起听]《${sharePayload.title}》 - ${sharePayload.artist}${lyricsSnippet}`
+                ? `[正在与你一起听歌]《${sharePayload.title}》 - ${sharePayload.artist}${lyricsSnippet}\n【系统要求】：你正戴着耳机与对方实时听同一首歌。请像平时聊天一样自然闲聊、分享当下情绪与生活，保持你的角色语气。绝不要做歌词解析、诗意赏析或逐句点评歌曲，把音乐当成背景陪伴即可。`
                 : "";
             pushChatMessage({
                 sessionId: sess.id,
