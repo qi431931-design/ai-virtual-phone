@@ -31,7 +31,7 @@ import { generateEmbedding, resolveEmbeddingModel } from "@/lib/memory-embedding
 import { BINDING_ACCENTS } from "@/lib/ui-accent-colors";
 
 type MemoryView = "list" | "detail" | "settings";
-type MemoryTab = "short" | "shared" | "living_room" | "boxes" | "attic" | "core";
+type MemoryTab = "living_room" | "boxes" | "attic" | "short" | "core";
 type MemoryBudgetKey = "shortTermTokenBudget" | "coreMemoryTokenBudget" | "longTermTokenBudget";
 
 const MEMORY_TOKEN_BUDGET_MAX = 100000;
@@ -686,25 +686,13 @@ export function MemoryBankPage({ view, selectedCharId, onSelectChar, onNotice }:
                             加载中...
                         </p>
                     ) : activeTab === "short" ? (
-                        /* ── Short-term: card view ── */
+                        /* ── Short-term & Shared: unified timeline ── */
                         <>
                             <MemoryTimeline
-                                events={shortTermEvents}
+                                events={[...shortTermEvents, ...sharedEvents].sort((a, b) => (b.timestamp || "").localeCompare(a.timestamp || ""))}
                                 userName={resolveUserIdentity(selectedCharId!)?.name || "用户"}
                             />
                         </>
-                    ) : activeTab === "shared" ? (
-                        /* ── Shared events: card view ── */
-                        sharedEvents.length === 0 ? (
-                            <p className="text-center ts-14 mt-10 text-secondary">
-                                暂无共享事件。用户发朋友圈或参与群聊后会自动显示。
-                            </p>
-                        ) : (
-                            <MemoryTimeline
-                                events={sharedEvents}
-                                userName={resolveUserIdentity(selectedCharId!)?.name || "用户"}
-                            />
-                        )
                     ) : activeTab === "living_room" ? (
                         /* ── SullyOS Living Room (Active) ── */
                         renderMemoryEntries("long_term", longTermEntries.filter(e => e.room !== "attic"), "客厅暂无活节点。聊天提炼的长期记忆会优先入驻客厅。")
@@ -744,12 +732,11 @@ export function MemoryBankPage({ view, selectedCharId, onSelectChar, onNotice }:
                 {/* Bottom tab bar — floating above bottom */}
                 <div className="chat-tab-bar overflow-x-auto no-scrollbar" style={{ position: "absolute", bottom: 20, left: 16, right: 16, zIndex: 10, borderRadius: 28, borderTop: "none", padding: "8px 12px", display: "flex", gap: 8, justifyContent: "space-between" }}>
                     {([
-                        { key: "living_room" as const, icon: Archive, label: "客厅活节点" },
+                        { key: "living_room" as const, icon: Archive, label: "长期记忆 (客厅)" },
                         { key: "boxes" as const, icon: Brain, label: "事件盒" },
-                        { key: "attic" as const, icon: Archive, label: "阁楼沉淀" },
-                        { key: "short" as const, icon: Clock, label: "短期" },
-                        { key: "shared" as const, icon: Users, label: "共享" },
-                        { key: "core" as const, icon: Archive, label: "核心" },
+                        { key: "attic" as const, icon: Archive, label: "冷归档 (阁楼)" },
+                        { key: "short" as const, icon: Clock, label: "短期事件" },
+                        { key: "core" as const, icon: Archive, label: "核心记忆" },
                     ]).map(tab => (
                         <button
                             key={tab.key}
