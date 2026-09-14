@@ -553,10 +553,23 @@ function ClusterDetail({
                             (() => {
                                 const entry = group.entries[0] as ParsedProjection;
                                 return (
-                                    <div className="mem-tl-system" style={{ padding: "8px 12px", background: "color-mix(in srgb, var(--c-icon-active) 6%, transparent)", borderRadius: 8, border: "1px solid color-mix(in srgb, var(--c-icon-active) 12%, transparent)" }}>
-                                        <span className="ui-status-tag" data-variant="action" style={{ marginRight: 6, fontSize: "calc(10px*var(--app-text-scale,1))" }}>{entry.label}</span>
-                                        <span className="mem-tl-projection-text">{entry.message}</span>
-                                        <span className="mem-tl-bubble-ts" style={{ marginLeft: 6 }}>{fmtTime(entry.timestamp)}</span>
+                                    <div className="mem-tl-system group" style={{ padding: "8px 12px", background: "color-mix(in srgb, var(--c-icon-active) 6%, transparent)", borderRadius: 8, border: "1px solid color-mix(in srgb, var(--c-icon-active) 12%, transparent)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                                        <div className="flex-1 min-w-0 pr-2">
+                                            <span className="ui-status-tag" data-variant="action" style={{ marginRight: 6, fontSize: "calc(10px*var(--app-text-scale,1))" }}>{entry.label}</span>
+                                            <span className="mem-tl-projection-text">{entry.message}</span>
+                                            <span className="mem-tl-bubble-ts" style={{ marginLeft: 6 }}>{fmtTime(entry.timestamp)}</span>
+                                        </div>
+                                        {characterId && rawEventsMap.has(entry.id) && (
+                                            <button
+                                                type="button"
+                                                onClick={(evt) => handleDelete(evt, entry.id)}
+                                                disabled={deletingId === entry.id}
+                                                className="text-red-400 hover:text-red-500 opacity-0 group-hover:opacity-100 hover:opacity-100 p-0.5 transition-all shrink-0"
+                                                title="删除此条事件"
+                                            >
+                                                <Trash2 size={12} />
+                                            </button>
+                                        )}
                                     </div>
                                 );
                             })()
@@ -565,10 +578,23 @@ function ClusterDetail({
                                 const entry = group.entries[0] as ParsedMoment;
                                 const commentThreads = buildTwoLevelMomentThreads(entry.comments);
                                 return (
-                                    <div className="mem-tl-moment">
-                                        <div className="mem-tl-moment-head">
+                                    <div className="mem-tl-moment group">
+                                        <div className="mem-tl-moment-head flex items-center justify-between">
                                             <span className="mem-tl-moment-author">{entry.author}</span>
-                                            <span className="mem-tl-bubble-ts">{fmtTime(entry.timestamp)}</span>
+                                            <div className="flex items-center gap-1.5">
+                                                <span className="mem-tl-bubble-ts">{fmtTime(entry.timestamp)}</span>
+                                                {characterId && rawEventsMap.has(entry.id) && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={(evt) => handleDelete(evt, entry.id)}
+                                                        disabled={deletingId === entry.id}
+                                                        className="text-red-400 hover:text-red-500 opacity-0 group-hover:opacity-100 hover:opacity-100 p-0.5 transition-all"
+                                                        title="删除此条动态"
+                                                    >
+                                                        <Trash2 size={12} />
+                                                    </button>
+                                                )}
+                                            </div>
                                         </div>
                                         <p className="mem-tl-moment-text">{entry.content}</p>
                                         {entry.location && <span className="mem-tl-moment-loc">{entry.location}</span>}
