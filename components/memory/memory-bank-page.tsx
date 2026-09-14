@@ -187,7 +187,7 @@ type Props = {
 export function MemoryBankPage({ view, selectedCharId, onSelectChar, onNotice }: Props) {
     const [config, setConfig] = useState<MemoryConfig>(loadMemoryConfig);
     const [characters, setCharacters] = useState<CharacterMemoryInfo[]>([]);
-    const [activeTab, setActiveTab] = useState<MemoryTab>("short");
+    const [activeTab, setActiveTab] = useState<MemoryTab>("living_room");
     const [coreEntries, setCoreEntries] = useState<MemoryEntry[]>([]);
     const [longTermEntries, setLongTermEntries] = useState<MemoryEntry[]>([]);
     const [eventBoxes, setEventBoxes] = useState<EventBox[]>([]);
@@ -332,8 +332,13 @@ export function MemoryBankPage({ view, selectedCharId, onSelectChar, onNotice }:
     const handleClearEntries = async (type: "core" | "long_term") => {
         if (!selectedCharId) return;
         await deleteCharacterMemoriesByType(selectedCharId, type);
-        if (type === "core") setCoreEntries([]);
-        else setLongTermEntries([]);
+        if (type === "core") {
+            setCoreEntries([]);
+        } else {
+            setLongTermEntries([]);
+            saveEventBoxes(selectedCharId, []);
+            setEventBoxes([]);
+        }
         loadCharacterList();
     };
 
