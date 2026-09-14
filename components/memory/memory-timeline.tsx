@@ -532,10 +532,10 @@ function ClusterDetail({
                                                         type="button"
                                                         onClick={(evt) => handleDelete(evt, e.id)}
                                                         disabled={deletingId === e.id}
-                                                        className="text-red-400 hover:text-red-500 opacity-0 group-hover:opacity-100 hover:opacity-100 p-0.5 transition-all"
+                                                        className="text-red-400 hover:text-red-500 p-0.5 transition-all shrink-0 ml-1"
                                                         title="删除此条事件"
                                                     >
-                                                        <Trash2 size={12} />
+                                                        <Trash2 size={13} />
                                                     </button>
                                                 )}
                                             </span>
@@ -564,10 +564,10 @@ function ClusterDetail({
                                                 type="button"
                                                 onClick={(evt) => handleDelete(evt, entry.id)}
                                                 disabled={deletingId === entry.id}
-                                                className="text-red-400 hover:text-red-500 opacity-0 group-hover:opacity-100 hover:opacity-100 p-0.5 transition-all shrink-0"
+                                                className="text-red-400 hover:text-red-500 p-0.5 transition-all shrink-0 ml-1"
                                                 title="删除此条事件"
                                             >
-                                                <Trash2 size={12} />
+                                                <Trash2 size={13} />
                                             </button>
                                         )}
                                     </div>
@@ -588,10 +588,10 @@ function ClusterDetail({
                                                         type="button"
                                                         onClick={(evt) => handleDelete(evt, entry.id)}
                                                         disabled={deletingId === entry.id}
-                                                        className="text-red-400 hover:text-red-500 opacity-0 group-hover:opacity-100 hover:opacity-100 p-0.5 transition-all"
+                                                        className="text-red-400 hover:text-red-500 p-0.5 transition-all ml-1"
                                                         title="删除此条动态"
                                                     >
-                                                        <Trash2 size={12} />
+                                                        <Trash2 size={13} />
                                                     </button>
                                                 )}
                                             </div>

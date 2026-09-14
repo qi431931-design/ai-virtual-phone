@@ -616,11 +616,8 @@ export default function MusicPlayer() {
                                 <div
                                     className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full mb-2.5 cursor-pointer select-none transition-all active:scale-95"
                                     style={{
-                                        background: "linear-gradient(135deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.06))",
-                                        backdropFilter: "blur(20px)",
-                                        WebkitBackdropFilter: "blur(20px)",
-                                        border: "1px solid rgba(255, 255, 255, 0.2)",
-                                        boxShadow: "0 4px 20px rgba(0, 0, 0, 0.25)",
+                                        background: "rgba(0, 0, 0, 0.35)",
+                                        border: "1px solid rgba(255, 255, 255, 0.12)",
                                     }}
                                     onClick={(e) => {
                                         e.stopPropagation();
