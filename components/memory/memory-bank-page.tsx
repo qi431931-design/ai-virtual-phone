@@ -8,7 +8,7 @@ import { Toggle } from "@/components/ui/form";
 import { loadCharacters } from "@/lib/character-storage";
 import type { Character } from "@/lib/character-types";
 import type { MemoryEntry, MemoryConfig, EventBox } from "@/lib/memory-types";
-import { loadEventBoxes } from "@/lib/event-box-service";
+import { loadEventBoxes, saveEventBoxes } from "@/lib/event-box-service";
 import { DEFAULT_CORE_MEMORY_PROMPT, DEFAULT_SUMMARIZATION_PROMPT } from "@/lib/memory-types";
 import {
     loadMemoryConfig,

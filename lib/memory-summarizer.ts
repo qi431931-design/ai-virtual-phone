@@ -196,8 +196,8 @@ export async function runSummarizationPipeline(
     // loadMemoryEntries() also returns "core" entries, and mixing them in let core
     // memories be demoted to the attic — and, worse, the cap below (oldest first)
     // silently deleted them.
-    const allEntries = await loadMemoryEntries(characterId);
-    const longTermEntries = allEntries.filter(e => e.type === "long_term");
+    const storedEntries = await loadMemoryEntries(characterId);
+    const longTermEntries = storedEntries.filter(e => e.type === "long_term");
     const maxLivingRoom = config.maxLivingRoomEntries ?? 200;
     const decayRate = config.importanceDecayRatePerHour ?? 0.995;
     const { updatedEntries, demotedCount } = evictLivingRoomEntries(longTermEntries, maxLivingRoom, decayRate);

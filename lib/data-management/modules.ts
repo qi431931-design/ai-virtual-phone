@@ -190,6 +190,10 @@ const PRIMARY_DATA_MODULES: DataModuleDefinition[] = [
           "ai_phone_mem_core_count_",
           "ai_phone_mem_last_core_sum_",
           "aivp_event_boxes_",
+          // 便签墙投影事件的实际键前缀是 ai_phone_notewall_events_（见 lib/notewall-memory.ts）。
+          // 原先只写了 note_wall_events_，对不上任何键，导致这些事件被归到「缓存与未分类数据」：
+          // 只导出「记忆」时漏掉，只清「缓存」时又会被当临时数据清掉——而它们是记忆总结的素材。
+          "ai_phone_notewall_events_",
           "note_wall_events_",
           "ai_phone_interview_magazine_events_",
           "ai_phone_cocreate_events_",
