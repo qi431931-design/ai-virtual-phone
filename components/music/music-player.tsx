@@ -574,6 +574,14 @@ export default function MusicPlayer() {
                                     }}
                                     onClick={(e) => {
                                         e.stopPropagation();
+                                        const cleanLyrics = (track.lyrics || "")
+                                            .replace(/\[\d+:\d+(?:\.\d+)?\]/g, "")
+                                            .split("\n")
+                                            .map(l => l.trim())
+                                            .filter(Boolean)
+                                            .slice(0, 10)
+                                            .join("\n");
+
                                         // Directly open mini-chat with music payload
                                         window.dispatchEvent(new CustomEvent("open-mini-chat", {
                                             detail: {
@@ -582,6 +590,8 @@ export default function MusicPlayer() {
                                                     type: "music",
                                                     title: track.title,
                                                     artist: track.artist || "未知歌手",
+                                                    lyrics: cleanLyrics || undefined,
+                                                    isTogether: true,
                                                 },
                                             }
                                         }));
@@ -822,7 +832,16 @@ export default function MusicPlayer() {
                                             setTogetherChar(c);
                                             setShowTogetherPicker(false);
                                             showMusicToast(`已与 ${c.name} 开启一起听`);
-                                            // Open mini chat immediately with music share payload
+                                            // Extract clean lyrics snippet without timestamps
+                                            const cleanLyrics = (track.lyrics || "")
+                                                .replace(/\[\d+:\d+(?:\.\d+)?\]/g, "")
+                                                .split("\n")
+                                                .map(l => l.trim())
+                                                .filter(Boolean)
+                                                .slice(0, 10)
+                                                .join("\n");
+
+                                            // Open mini chat immediately with music share payload + lyrics snippet
                                             window.dispatchEvent(new CustomEvent("open-mini-chat", {
                                                 detail: {
                                                     contactId: c.id,
@@ -830,6 +849,8 @@ export default function MusicPlayer() {
                                                         type: "music",
                                                         title: track.title,
                                                         artist: track.artist || "未知歌手",
+                                                        lyrics: cleanLyrics || undefined,
+                                                        isTogether: true,
                                                     },
                                                 }
                                             }));
