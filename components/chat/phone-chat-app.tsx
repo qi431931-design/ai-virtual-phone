@@ -167,7 +167,7 @@ export const PhoneChatApp = memo(function PhoneChatApp({ onClose, initialSession
         if (sharePayload && sess) {
             if (sharePayload.type === "music") {
                 const lyricsSnippet = sharePayload.lyrics?.trim()
-                    ? `\n歌词片段：${sharePayload.lyrics.trim().slice(0, 180)}（自然陪伴，勿刻意解读）`
+                    ? `\n歌词：${sharePayload.lyrics.trim()}（自然陪伴，勿刻意解读）`
                     : "";
                 const content = sharePayload.isTogether
                     ? `[一起听]《${sharePayload.title}》 - ${sharePayload.artist}${lyricsSnippet}`
