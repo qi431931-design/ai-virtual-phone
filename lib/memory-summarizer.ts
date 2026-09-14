@@ -192,18 +192,24 @@ export async function runSummarizationPipeline(
     resetEventCounter(characterId);
 
     // SullyOS Living Room Eviction & Decay
-    const allLongTerm = await loadMemoryEntries(characterId);
+    // Only long_term entries take part in the room mechanism and the total cap:
+    // loadMemoryEntries() also returns "core" entries, and mixing them in let core
+    // memories be demoted to the attic — and, worse, the cap below (oldest first)
+    // silently deleted them.
+    const allEntries = await loadMemoryEntries(characterId);
+    const longTermEntries = allEntries.filter(e => e.type === "long_term");
     const maxLivingRoom = config.maxLivingRoomEntries ?? 200;
     const decayRate = config.importanceDecayRatePerHour ?? 0.995;
-    const { updatedEntries, demotedCount } = evictLivingRoomEntries(allLongTerm, maxLivingRoom, decayRate);
+    const { updatedEntries, demotedCount } = evictLivingRoomEntries(longTermEntries, maxLivingRoom, decayRate);
     if (demotedCount > 0) {
-        for (const demoted of updatedEntries.filter(e => e.room === "attic")) {
+        const previouslyLiving = new Set(longTermEntries.filter(e => e.room !== "attic").map(e => e.id));
+        for (const demoted of updatedEntries.filter(e => e.room === "attic" && previouslyLiving.has(e.id))) {
             await saveMemoryEntry(demoted);
         }
         console.log(`[MemorySummarizer] Evicted ${demotedCount} entries from living_room to attic`);
     }
 
-    // Enforce total long-term limit
+    // Enforce total long-term limit (long_term only — core memories are never trimmed here)
     if (updatedEntries.length > config.maxLongTermEntries) {
         const excess = updatedEntries.slice(0, updatedEntries.length - config.maxLongTermEntries);
         await deleteMemoryEntries(excess.map(e => e.id));
