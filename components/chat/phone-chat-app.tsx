@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useState, useEffect, useRef } from "react";
+import { memo, useState, useEffect, useRef, useCallback } from "react";
 import { ChatMessageList } from "./chat-message-list";
 import { ChatContactsList } from "./chat-contacts-list";
 import { MomentsFeed } from "./moments-feed";
@@ -68,14 +68,75 @@ export const PhoneChatApp = memo(function PhoneChatApp({ onClose, initialSession
         if (s) setActiveSession(s);
     }, [initialSessionId, dbReady]);
 
-    // When sharePayload is set, switch to contacts tab (and close any open chat room)
-    useEffect(() => {
-        if (sharePayload) {
-            setActiveSession(null);
-            setActiveMascot(false);
-            setActiveTab("contacts");
+    /** Deliver the pending share payload into an existing session (音乐卡片 / 小红书笔记)。 */
+    const emitShareMessage = useCallback((sess: ChatSession) => {
+        if (!sharePayload) return;
+        if (sharePayload.type === "music") {
+            const lyricsSnippet = sharePayload.lyrics?.trim()
+                ? `\n歌词：${sharePayload.lyrics.trim()}（自然陪伴，勿刻意解读）`
+                : "";
+            const content = sharePayload.isTogether
+                ? `[一起听]《${sharePayload.title}》 - ${sharePayload.artist}${lyricsSnippet}`
+                : "";
+            pushChatMessage({
+                sessionId: sess.id,
+                role: "user",
+                content,
+                mediaType: "music_share",
+                mediaData: {
+                    musicTitle: sharePayload.title,
+                    musicArtist: sharePayload.artist,
+                    label: `${sharePayload.title} - ${sharePayload.artist}`,
+                },
+            });
+        } else {
+            const content = formatXiaohongshuShareForPrompt({
+                author: sharePayload.authorName,
+                title: sharePayload.title,
+                body: sharePayload.body,
+                description: sharePayload.description,
+            });
+            pushChatMessage({
+                sessionId: sess.id,
+                role: "user",
+                content,
+                mediaType: "xiaohongshu_note_share",
+                mediaData: {
+                    xiaohongshuAuthor: sharePayload.authorName,
+                    xiaohongshuTitle: sharePayload.title,
+                    xiaohongshuBody: sharePayload.body,
+                    xiaohongshuDescription: sharePayload.description,
+                    xiaohongshuNoteType: sharePayload.noteType,
+                    xiaohongshuTags: sharePayload.tags,
+                    xiaohongshuImageAssetId: sharePayload.imageAssetId,
+                    xiaohongshuCoverIcon: sharePayload.coverIcon,
+                    xiaohongshuTone: sharePayload.tone,
+                },
+            });
         }
-    }, [sharePayload]);
+        window.dispatchEvent(new CustomEvent("chat-messages-updated", { detail: { sessionId: sess.id } }));
+        onShareDone?.();
+    }, [sharePayload, onShareDone]);
+
+    // When sharePayload is set: jump straight into the target contact's chat room
+    // when the payload names one (e.g. 「一起听」), otherwise fall back to the contact list.
+    useEffect(() => {
+        if (!sharePayload) return;
+        const contactId = sharePayload.type === "music" ? sharePayload.contactId : undefined;
+        const target = contactId && dbReady
+            ? loadChatSessions().find(s => s.contactId === contactId && !s.isGroup)
+            : undefined;
+        if (target) {
+            emitShareMessage(target);
+            setActiveMascot(false);
+            setActiveSession(target);
+            setActiveTab("messages");
+            return;
+        }
+        setActiveSession(null);
+        setActiveMascot(false);
+        setActiveTab("contacts");
+    }, [sharePayload, dbReady, emitShareMessage]);
 
     useEffect(() => {
         const handler = (e: Event) => {
@@ -164,53 +225,7 @@ export const PhoneChatApp = memo(function PhoneChatApp({ onClose, initialSession
     }, [activeMascot]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const handleSelectContact = (sess: ChatSession | null) => {
-        if (sharePayload && sess) {
-            if (sharePayload.type === "music") {
-                const lyricsSnippet = sharePayload.lyrics?.trim()
-                    ? `\n歌词：${sharePayload.lyrics.trim()}（自然陪伴，勿刻意解读）`
-                    : "";
-                const content = sharePayload.isTogether
-                    ? `[一起听]《${sharePayload.title}》 - ${sharePayload.artist}${lyricsSnippet}`
-                    : "";
-                pushChatMessage({
-                    sessionId: sess.id,
-                    role: "user",
-                    content,
-                    mediaType: "music_share",
-                    mediaData: {
-                        musicTitle: sharePayload.title,
-                        musicArtist: sharePayload.artist,
-                        label: `${sharePayload.title} - ${sharePayload.artist}`,
-                    },
-                });
-            } else {
-                const content = formatXiaohongshuShareForPrompt({
-                    author: sharePayload.authorName,
-                    title: sharePayload.title,
-                    body: sharePayload.body,
-                    description: sharePayload.description,
-                });
-                pushChatMessage({
-                    sessionId: sess.id,
-                    role: "user",
-                    content,
-                    mediaType: "xiaohongshu_note_share",
-                    mediaData: {
-                        xiaohongshuAuthor: sharePayload.authorName,
-                        xiaohongshuTitle: sharePayload.title,
-                        xiaohongshuBody: sharePayload.body,
-                        xiaohongshuDescription: sharePayload.description,
-                        xiaohongshuNoteType: sharePayload.noteType,
-                        xiaohongshuTags: sharePayload.tags,
-                        xiaohongshuImageAssetId: sharePayload.imageAssetId,
-                        xiaohongshuCoverIcon: sharePayload.coverIcon,
-                        xiaohongshuTone: sharePayload.tone,
-                    },
-                });
-            }
-            window.dispatchEvent(new CustomEvent("chat-messages-updated", { detail: { sessionId: sess.id } }));
-            onShareDone?.();
-        }
+        if (sess) emitShareMessage(sess);
         setActiveMascot(false);
         setActiveSession(sess);
         setActiveTab("messages");
