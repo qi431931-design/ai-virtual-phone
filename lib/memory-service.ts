@@ -6,6 +6,7 @@ import { loadMemoryEntriesByType } from "./memory-storage";
 import { resolveAuxiliaryApiConfig } from "./settings-storage";
 import { generateEmbedding, resolveEmbeddingModel, cosineSimilarity } from "./memory-embedding";
 import { estimateTokens } from "./token-counter";
+import { rerankMemories } from "./memory-rerank";
 
 /**
  * Retrieve relevant long-term memories for prompt injection.
@@ -48,7 +49,10 @@ export async function retrieveMemoriesForPrompt(
                     score: cosineSimilarity(queryEmbedding, entry.embedding!),
                 }));
                 scored.sort((a, b) => b.score - a.score);
-                const ranked = scored.map(s => s.entry);
+                // Optional rerank pass: hand the vector-ranked entries to the rerank model.
+                // No-op (original order kept) when no rerank API is bound.
+                const ranked = (await rerankMemories(currentContext, scored.map(s => s.entry)))
+                    ?? scored.map(s => s.entry);
                 const selected = fillByBudget(ranked, budget);
                 // Entries without an embedding (manually added, or the embedding call failed)
                 // must not stay excluded from injection forever — backfill them with the
@@ -66,7 +70,10 @@ export async function retrieveMemoriesForPrompt(
     }
 
     // Strategy 3: no embedding support → living_room (active) first, then by recency
-    return fillByBudget(sortByRoomAndRecency(longTermEntries), budget);
+    const recencyRanked = sortByRoomAndRecency(longTermEntries);
+    // Same optional rerank pass on the recency-ordered candidate pool.
+    const ordered = (await rerankMemories(currentContext, recencyRanked)) ?? recencyRanked;
+    return fillByBudget(ordered, budget);
 }
 
 export async function retrieveCoreMemoriesForPrompt(

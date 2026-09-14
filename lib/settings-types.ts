@@ -312,6 +312,8 @@ export type BindingConfig = {
     memorySummaryApiConfigId?: string;
     /** Auxiliary API: used for embedding/vector recall (global, not per-character) */
     embeddingApiConfigId?: string;
+    /** Auxiliary API: used to rerank recalled memories (global, not per-character) */
+    rerankApiConfigId?: string;
     /** Auxiliary API: used by the mascot assistant (global, not per-character) */
     mascotApiConfigId?: string;
     /** Auxiliary API: used by the QA workshop agent (global, not per-character) */

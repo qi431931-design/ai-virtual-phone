@@ -4,6 +4,7 @@
 import type { ApiConfig } from "./settings-types";
 import type { MemoryEntry, MemorySearchResult } from "./memory-types";
 import { determineBaseUrl, buildRequestHeaders } from "./api-helpers";
+import { rerankMemories, DEFAULT_RERANK_CANDIDATES } from "./memory-rerank";
 
 // ── Provider → Embedding Model Mapping ──
 
@@ -110,6 +111,8 @@ export async function searchMemories(
     if (memories.length === 0) return [];
 
     // Try vector search if the config resolves to an embedding model
+    let results: MemorySearchResult[] | null = null;
+
     if (apiConfig && resolveEmbeddingModel(apiConfig)) {
         const queryEmbedding = await generateEmbedding(query, apiConfig);
         if (queryEmbedding) {
@@ -120,13 +123,24 @@ export async function searchMemories(
                     score: cosineSimilarity(queryEmbedding, entry.embedding!),
                 }));
                 scored.sort((a, b) => b.score - a.score);
-                return scored.slice(0, topK);
+                results = scored;
             }
         }
     }
 
     // Fallback: keyword search
-    return keywordSearch(query, memories, topK);
+    if (!results) results = keywordSearch(query, memories, Math.max(topK, DEFAULT_RERANK_CANDIDATES));
+
+    // Optional rerank pass over the candidate pool (no-op when no rerank API is bound).
+    // Scores are preserved from the retrieval stage; only the order changes.
+    const poolSize = Math.max(topK, DEFAULT_RERANK_CANDIDATES);
+    const poolEntries = results.slice(0, poolSize).map(r => r.entry);
+    const reranked = await rerankMemories(query, poolEntries, { candidates: poolSize });
+    if (reranked) {
+        const scoreById = new Map(results.map(r => [r.entry.id, r.score]));
+        return reranked.slice(0, topK).map(entry => ({ entry, score: scoreById.get(entry.id) ?? 0 }));
+    }
+    return results.slice(0, topK);
 }
 
 // ── Keyword fallback ──
