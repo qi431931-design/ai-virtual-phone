@@ -1837,6 +1837,39 @@ export function MediaDetailModal({ msg, userName, groupSize, onAccept, onClose }
 
 // ── Music Share Bubble ──────────────────────────
 
+function MusicShareBubble({ msg, onPlay }: { msg: ChatMessage; onPlay?: (track: any) => void }) {
+    const title = msg.mediaData?.musicTitle || msg.content || "未知歌曲";
+    const artist = msg.mediaData?.musicArtist || "未知歌手";
+    return (
+        <div
+            className="flex items-center gap-3 p-3 rounded-2xl cursor-pointer select-none transition-all active:scale-[0.98]"
+            style={{
+                background: "linear-gradient(135deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.05))",
+                backdropFilter: "blur(12px)",
+                WebkitBackdropFilter: "blur(12px)",
+                border: "1px solid rgba(255, 255, 255, 0.15)",
+                minWidth: 190,
+                maxWidth: 260,
+            }}
+            onClick={() => {
+                onPlay?.({ title, artist });
+            }}
+        >
+            <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-500/30 shadow-inner">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M9 18V5l12-2v13" />
+                    <circle cx="6" cy="18" r="3" />
+                    <circle cx="18" cy="16" r="3" />
+                </svg>
+            </div>
+            <div className="flex flex-col min-w-0 flex-1">
+                <span className="ts-14 font-medium text-white/95 truncate leading-tight">{title}</span>
+                <span className="ts-11 text-white/60 truncate mt-0.5">{artist} · 一起听中</span>
+            </div>
+        </div>
+    );
+}
+
 // ── Media File Bubble ────────────────────────────────
 
 export function MediaImageWithPreview({
