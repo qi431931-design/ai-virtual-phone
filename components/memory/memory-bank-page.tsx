@@ -31,7 +31,7 @@ import { generateEmbedding, resolveEmbeddingModel } from "@/lib/memory-embedding
 import { BINDING_ACCENTS } from "@/lib/ui-accent-colors";
 
 type MemoryView = "list" | "detail" | "settings";
-type MemoryTab = "short" | "shared" | "boxes" | "long" | "core";
+type MemoryTab = "short" | "shared" | "living_room" | "boxes" | "attic" | "core";
 type MemoryBudgetKey = "shortTermTokenBudget" | "coreMemoryTokenBudget" | "longTermTokenBudget";
 
 const MEMORY_TOKEN_BUDGET_MAX = 100000;
@@ -700,6 +700,12 @@ export function MemoryBankPage({ view, selectedCharId, onSelectChar, onNotice }:
                                 userName={resolveUserIdentity(selectedCharId!)?.name || "用户"}
                             />
                         )
+                    ) : activeTab === "living_room" ? (
+                        /* ── SullyOS Living Room (Active) ── */
+                        renderMemoryEntries("long_term", longTermEntries.filter(e => e.room !== "attic"), "客厅暂无活节点。聊天提炼的长期记忆会优先入驻客厅。")
+                    ) : activeTab === "attic" ? (
+                        /* ── SullyOS Attic (Cold Archive) ── */
+                        renderMemoryEntries("long_term", longTermEntries.filter(e => e.room === "attic"), "阁楼暂无冷沉淀记忆。客厅超过上限后会自动衰减流转到阁楼。")
                     ) : activeTab === "boxes" ? (
                         /* ── SullyOS EventBox Tab ── */
                         eventBoxes.length === 0 ? (
@@ -725,8 +731,7 @@ export function MemoryBankPage({ view, selectedCharId, onSelectChar, onNotice }:
                     ) : activeTab === "core" ? (
                         renderMemoryEntries("core", coreEntries, "暂无核心记忆。长期记忆累计到设定条数后会自动提炼，也可以手动新增。")
                     ) : (
-                        /* ── Long-term: Summarized Memories ── */
-                        renderMemoryEntries("long_term", longTermEntries, "暂无长期记忆。点击设置页的手动总结，或直接新增一条记忆。")
+                        renderMemoryEntries("long_term", longTermEntries, "暂无记忆。")
                     )}
                     </MemoryDetailBoundary>
                 </div>
@@ -734,10 +739,11 @@ export function MemoryBankPage({ view, selectedCharId, onSelectChar, onNotice }:
                 {/* Bottom tab bar — floating above bottom */}
                 <div className="chat-tab-bar" style={{ position: "absolute", bottom: 40, left: 40, right: 40, zIndex: 10, borderRadius: 28, borderTop: "none", padding: "10px 0" }}>
                     {([
-                        { key: "short" as const, icon: Clock, label: "短期" },
-                        { key: "shared" as const, icon: Users, label: "共享事件" },
+                        { key: "living_room" as const, icon: Archive, label: "客厅活节点" },
                         { key: "boxes" as const, icon: Brain, label: "事件盒" },
-                        { key: "long" as const, icon: Archive, label: "长期" },
+                        { key: "attic" as const, icon: Archive, label: "阁楼沉淀" },
+                        { key: "short" as const, icon: Clock, label: "短期" },
+                        { key: "shared" as const, icon: Users, label: "共享" },
                         { key: "core" as const, icon: Archive, label: "核心" },
                     ]).map(tab => (
                         <button
