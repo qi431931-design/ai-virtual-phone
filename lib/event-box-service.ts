@@ -3,13 +3,29 @@
 
 import type { EventBox, MemoryEntry } from "./memory-types";
 import { sanitizeMemorySummary } from "./memory-guard";
+import { kvGet, kvSet, registerDynamicPrefix } from "./kv-db";
 
 const EVENT_BOX_KEY_PREFIX = "aivp_event_boxes_";
 
+// EventBox 必须走 kv-db（IndexedDB）：备份/导入/清空的数据源只读 AiPhoneKvDB，
+// 直接写 localStorage 的事件箱既不进备份、也清不掉、导不回来（数据管理 → 记忆
+// 模块里那条 aivp_event_boxes_ 前缀会永远是空的）。注册前缀让老设备的
+// localStorage 数据自动迁进来，不丢档。
+registerDynamicPrefix(EVENT_BOX_KEY_PREFIX);
+
+/** 事件箱摘要上限：新建首条与增量追加共用同一口径 */
+const SUMMARY_MAX_LENGTH = 500;
+
+function capSummary(text: string): string {
+    return text.length > SUMMARY_MAX_LENGTH
+        ? `${text.slice(0, SUMMARY_MAX_LENGTH - 3)}...`
+        : text;
+}
+
 export function loadEventBoxes(characterId: string): EventBox[] {
-    if (typeof localStorage === "undefined") return [];
+    if (typeof window === "undefined") return [];
     try {
-        const raw = localStorage.getItem(`${EVENT_BOX_KEY_PREFIX}${characterId}`);
+        const raw = kvGet(`${EVENT_BOX_KEY_PREFIX}${characterId}`);
         return raw ? JSON.parse(raw) : [];
     } catch {
         return [];
@@ -17,9 +33,9 @@ export function loadEventBoxes(characterId: string): EventBox[] {
 }
 
 export function saveEventBoxes(characterId: string, boxes: EventBox[]): void {
-    if (typeof localStorage === "undefined") return;
+    if (typeof window === "undefined") return;
     try {
-        localStorage.setItem(`${EVENT_BOX_KEY_PREFIX}${characterId}`, JSON.stringify(boxes));
+        kvSet(`${EVENT_BOX_KEY_PREFIX}${characterId}`, JSON.stringify(boxes));
     } catch (err) {
         console.error("[EventBoxService] Failed to save event boxes:", err);
     }
@@ -53,7 +69,7 @@ export function ingestEntryToEventBox(
             title: `事件片段 ${new Date().toLocaleDateString()}`,
             tags: ["日常"],
             status: "active",
-            summary: sanitizeMemorySummary(entry.content),
+            summary: capSummary(sanitizeMemorySummary(entry.content)),
             memberEntryIds: [entry.id],
             eventCount: 1,
             createdAt: now,
@@ -70,7 +86,7 @@ export function ingestEntryToEventBox(
             const separator = activeBox.summary ? "\n" : "";
             const combined = `${activeBox.summary}${separator}· ${sanitizedNewContent}`.trim();
             // Guard against unbounded summary explosion before sealing
-            activeBox.summary = combined.length > 500 ? combined.slice(0, 497) + "..." : combined;
+            activeBox.summary = capSummary(combined);
         }
     }
 
