@@ -2,6 +2,8 @@ export type MusicChatSharePayload = {
     type: "music";
     title: string;
     artist: string;
+    lyrics?: string;
+    isTogether?: boolean;
 };
 
 export type XiaohongshuNoteChatSharePayload = {
