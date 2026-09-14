@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useContext } from "react";
-import { Plus, RefreshCw, Rss, AlertCircle, FileEdit, Trash2, X, Check } from "lucide-react";
+import { Plus, RefreshCw, Rss, AlertCircle, FileEdit, Trash2, X, Check, Search } from "lucide-react";
 import { SettingsContext } from "../phone-settings-app";
 import type { ApiConfig } from "@/lib/settings-types";
 import { loadApiConfigs, removeApiConfigReferences, saveApiConfigs } from "@/lib/settings-storage";
@@ -44,6 +44,7 @@ export function ApiSettings() {
     const [fetchedModels, setFetchedModels] = useState<Record<string, string[]>>({});
     const [isTesting, setIsTesting] = useState<Record<string, boolean>>({});
     const [testResult, setTestResult] = useState<Record<string, { success: boolean; message: string }>>({});
+    const [modelSearchQuery, setModelSearchQuery] = useState<Record<string, string>>({});
 
     // Load from localStorage on mount
     useEffect(() => {
@@ -151,6 +152,8 @@ export function ApiSettings() {
             } else {
                 throw new Error("返回数据格式不符合预期");
             }
+            // SullyOS optimization: Alphabetically sort model names case-insensitively
+            modelNames.sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
             setFetchedModels(prev => ({ ...prev, [config.id]: modelNames }));
             setTestResult(prev => ({ ...prev, [config.id]: { success: true, message: `成功获取 ${modelNames.length} 个模型` } }));
         } catch (error: unknown) {
@@ -362,26 +365,53 @@ export function ApiSettings() {
 
                                         <div className="flex flex-col gap-1">
                                             <label className="menu-desc ml-1">默认模型 (Default Model)</label>
-                                            <div className="flex gap-2">
-                                                {fetchedModels[config.id] && fetchedModels[config.id].length > 0 ? (
-                                                    <select
-                                                        value={config.defaultModel}
-                                                        onChange={(e) => updateConfig(config.id, { defaultModel: e.target.value })}
-                                                        className="ui-select flex-1"
-                                                    >
-                                                        <option value="">请选择模型...</option>
-                                                        {fetchedModels[config.id].map(m => (
-                                                            <option key={m} value={m}>{m}</option>
-                                                        ))}
-                                                    </select>
-                                                ) : (
-                                                    <input
-                                                        type="text"
-                                                        value={config.defaultModel}
-                                                        onChange={(e) => updateConfig(config.id, { defaultModel: e.target.value })}
-                                                        placeholder="gpt-4o, claude-3-opus..."
-                                                        className="ui-input flex-1"
-                                                    />
+                                            <div className="flex flex-col gap-2">
+                                                <div className="flex gap-2">
+                                                    {fetchedModels[config.id] && fetchedModels[config.id].length > 0 ? (
+                                                        <select
+                                                            value={config.defaultModel}
+                                                            onChange={(e) => updateConfig(config.id, { defaultModel: e.target.value })}
+                                                            className="ui-select flex-1"
+                                                        >
+                                                            <option value="">请选择模型 ({fetchedModels[config.id].length} 个)...</option>
+                                                            {(modelSearchQuery[config.id]
+                                                                ? fetchedModels[config.id].filter(m => m.toLowerCase().includes(modelSearchQuery[config.id].toLowerCase()))
+                                                                : fetchedModels[config.id]
+                                                            ).map(m => (
+                                                                <option key={m} value={m}>{m}</option>
+                                                            ))}
+                                                        </select>
+                                                    ) : (
+                                                        <input
+                                                            type="text"
+                                                            value={config.defaultModel}
+                                                            onChange={(e) => updateConfig(config.id, { defaultModel: e.target.value })}
+                                                            placeholder="gpt-4o, claude-3-opus..."
+                                                            className="ui-input flex-1"
+                                                        />
+                                                    )}
+                                                </div>
+
+                                                {/* Model search input when models are fetched */}
+                                                {fetchedModels[config.id] && fetchedModels[config.id].length > 0 && (
+                                                    <div className="relative flex items-center">
+                                                        <Search size={14} className="absolute left-2.5 text-secondary pointer-events-none" />
+                                                        <input
+                                                            type="text"
+                                                            value={modelSearchQuery[config.id] || ""}
+                                                            onChange={(e) => setModelSearchQuery(prev => ({ ...prev, [config.id]: e.target.value }))}
+                                                            placeholder={`在 ${fetchedModels[config.id].length} 个模型中搜索过滤...`}
+                                                            className="ui-input flex-1 pl-8 pr-7 text-xs py-1 h-8"
+                                                        />
+                                                        {modelSearchQuery[config.id] && (
+                                                            <button
+                                                                onClick={() => setModelSearchQuery(prev => ({ ...prev, [config.id]: "" }))}
+                                                                className="absolute right-2 text-secondary hover:text-primary p-0.5"
+                                                            >
+                                                                <X size={12} />
+                                                            </button>
+                                                        )}
+                                                    </div>
                                                 )}
                                             </div>
                                         </div>
