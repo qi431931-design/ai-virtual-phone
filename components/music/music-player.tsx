@@ -574,11 +574,15 @@ export default function MusicPlayer() {
                                     }}
                                     onClick={(e) => {
                                         e.stopPropagation();
-                                        // Directly open mini-chat and inject current song context
+                                        // Directly open mini-chat with music payload
                                         window.dispatchEvent(new CustomEvent("open-mini-chat", {
                                             detail: {
                                                 contactId: togetherChar.id,
-                                                initialText: `我们正在一起听《${track.title}》 - ${track.artist || "未知歌手"}，这首歌感觉怎么样？`,
+                                                share: {
+                                                    type: "music",
+                                                    title: track.title,
+                                                    artist: track.artist || "未知歌手",
+                                                },
                                             }
                                         }));
                                     }}
@@ -818,11 +822,15 @@ export default function MusicPlayer() {
                                             setTogetherChar(c);
                                             setShowTogetherPicker(false);
                                             showMusicToast(`已与 ${c.name} 开启一起听`);
-                                            // Open mini chat immediately with song context
+                                            // Open mini chat immediately with music share payload
                                             window.dispatchEvent(new CustomEvent("open-mini-chat", {
                                                 detail: {
                                                     contactId: c.id,
-                                                    initialText: `正在和你一起听《${track.title}》 - ${track.artist || "未知歌手"} 🎧`,
+                                                    share: {
+                                                        type: "music",
+                                                        title: track.title,
+                                                        artist: track.artist || "未知歌手",
+                                                    },
                                                 }
                                             }));
                                         }}
