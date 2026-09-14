@@ -508,13 +508,22 @@ export default function MusicPlayer() {
                         className={`music-player-ctrl-btn mp-top-btn ${togetherChar ? "mp-together-active-btn" : ""}`}
                         onClick={() => setShowTogetherPicker(true)}
                         title={togetherChar ? `正在与 ${togetherChar.name} 一起听（点击管理）` : "邀请角色一起听"}
-                        style={togetherChar ? { position: "relative", padding: 0, overflow: "hidden", border: "1.5px solid rgba(52, 211, 153, 0.8)", borderRadius: "50%", width: 28, height: 28 } : undefined}
+                        style={togetherChar ? {
+                            position: "relative",
+                            padding: 0,
+                            overflow: "hidden",
+                            borderRadius: "50%",
+                            width: 30,
+                            height: 30,
+                            border: "1.5px solid rgba(255, 255, 255, 0.35)",
+                            boxShadow: "0 2px 8px rgba(0, 0, 0, 0.35)",
+                        } : undefined}
                     >
                         {togetherChar ? (
                             togetherChar.avatar ? (
                                 <img src={togetherChar.avatar} alt={togetherChar.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                             ) : (
-                                <span style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", background: "#10b981", color: "#fff", fontSize: 11, fontWeight: "bold" }}>
+                                <span style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(255, 255, 255, 0.18)", backdropFilter: "blur(8px)", color: "#fff", fontSize: 11, fontWeight: 600 }}>
                                     {togetherChar.name.slice(0, 1)}
                                 </span>
                             )
@@ -607,11 +616,11 @@ export default function MusicPlayer() {
                                 <div
                                     className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full mb-2.5 cursor-pointer select-none transition-all active:scale-95"
                                     style={{
-                                        background: "linear-gradient(135deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.08))",
-                                        backdropFilter: "blur(16px)",
-                                        WebkitBackdropFilter: "blur(16px)",
-                                        border: "1px solid rgba(255, 255, 255, 0.25)",
-                                        boxShadow: "0 4px 16px rgba(0, 0, 0, 0.3)",
+                                        background: "linear-gradient(135deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.06))",
+                                        backdropFilter: "blur(20px)",
+                                        WebkitBackdropFilter: "blur(20px)",
+                                        border: "1px solid rgba(255, 255, 255, 0.2)",
+                                        boxShadow: "0 4px 20px rgba(0, 0, 0, 0.25)",
                                     }}
                                     onClick={(e) => {
                                         e.stopPropagation();
@@ -638,17 +647,14 @@ export default function MusicPlayer() {
                                     title="点击与角色边听边聊"
                                 >
                                     {togetherChar.avatar ? (
-                                        <img src={togetherChar.avatar} alt={togetherChar.name} className="w-4 h-4 rounded-full object-cover shrink-0 ring-1 ring-emerald-400" />
+                                        <img src={togetherChar.avatar} alt={togetherChar.name} className="w-4 h-4 rounded-full object-cover shrink-0" style={{ border: "1px solid rgba(255, 255, 255, 0.4)" }} />
                                     ) : (
-                                        <span className="relative flex h-2 w-2">
-                                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                                            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400" />
-                                        </span>
+                                        <span className="w-2 h-2 rounded-full bg-white/70 animate-pulse" />
                                     )}
                                     <span className="text-xs font-medium tracking-wide text-white/95">
                                         与 {togetherChar.name} 一起听
                                     </span>
-                                    <span className="text-[10px] text-emerald-300 bg-emerald-950/60 px-1.5 py-0.5 rounded-full font-medium">
+                                    <span className="text-[10px] text-white/80 bg-white/10 px-1.5 py-0.5 rounded-full font-normal border border-white/10">
                                         边听边聊 💬
                                     </span>
                                 </div>
