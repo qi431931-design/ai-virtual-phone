@@ -166,11 +166,11 @@ export const PhoneChatApp = memo(function PhoneChatApp({ onClose, initialSession
     const handleSelectContact = (sess: ChatSession | null) => {
         if (sharePayload && sess) {
             if (sharePayload.type === "music") {
-                const lyricsSnippet = sharePayload.lyrics
-                    ? `\n\n【当前歌曲部分歌词参考】\n${sharePayload.lyrics.slice(0, 300)}\n（提示：自然聆听陪伴即可，请勿生硬刻意逐字解读歌词）`
+                const lyricsSnippet = sharePayload.lyrics?.trim()
+                    ? `\n歌词片段：${sharePayload.lyrics.trim().slice(0, 180)}（自然陪伴，勿刻意解读）`
                     : "";
                 const content = sharePayload.isTogether
-                    ? `[我发起了与你一起听歌]《${sharePayload.title}》 - ${sharePayload.artist}${lyricsSnippet}`
+                    ? `[一起听]《${sharePayload.title}》 - ${sharePayload.artist}${lyricsSnippet}`
                     : "";
                 pushChatMessage({
                     sessionId: sess.id,
