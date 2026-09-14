@@ -6,6 +6,7 @@ import { loadMemoryEntriesByType } from "./memory-storage";
 import { resolveAuxiliaryApiConfig } from "./settings-storage";
 import { generateEmbedding, resolveEmbeddingModel, cosineSimilarity } from "./memory-embedding";
 import { estimateTokens } from "./token-counter";
+import { rerankMemories } from "./memory-rerank";
 
 /**
  * Retrieve relevant long-term memories for prompt injection.
@@ -48,19 +49,31 @@ export async function retrieveMemoriesForPrompt(
                     score: cosineSimilarity(queryEmbedding, entry.embedding!),
                 }));
                 scored.sort((a, b) => b.score - a.score);
-                return fillByBudget(scored.map(s => s.entry), budget);
+                // Optional rerank pass: hand the vector-ranked entries to the rerank model.
+                // No-op (original order kept) when no rerank API is bound.
+                const ranked = (await rerankMemories(currentContext, scored.map(s => s.entry)))
+                    ?? scored.map(s => s.entry);
+                const selected = fillByBudget(ranked, budget);
+                // Entries without an embedding (manually added, or the embedding call failed)
+                // must not stay excluded from injection forever — backfill them with the
+                // leftover budget, still living_room first / newest first.
+                const usedTokens = selected.reduce((sum, e) => sum + estimateTokens(e.content) + 4, 0);
+                const leftover = budget - usedTokens;
+                if (leftover > 0) {
+                    const rankedIds = new Set(ranked.map(e => e.id));
+                    const rest = sortByRoomAndRecency(longTermEntries.filter(e => !rankedIds.has(e.id)));
+                    selected.push(...fillByBudget(rest, leftover));
+                }
+                return selected;
             }
         }
     }
 
     // Strategy 3: no embedding support → living_room (active) first, then by recency
-    const sorted = [...longTermEntries].sort((a, b) => {
-        const roomWeightA = a.room === "attic" ? 0 : 1;
-        const roomWeightB = b.room === "attic" ? 0 : 1;
-        if (roomWeightA !== roomWeightB) return roomWeightB - roomWeightA;
-        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-    });
-    return fillByBudget(sorted, budget);
+    const recencyRanked = sortByRoomAndRecency(longTermEntries);
+    // Same optional rerank pass on the recency-ordered candidate pool.
+    const ordered = (await rerankMemories(currentContext, recencyRanked)) ?? recencyRanked;
+    return fillByBudget(ordered, budget);
 }
 
 export async function retrieveCoreMemoriesForPrompt(
@@ -80,6 +93,16 @@ export async function retrieveCoreMemoriesForPrompt(
     });
 
     return fillByBudget(sorted, config.coreMemoryTokenBudget);
+}
+
+/** living_room (active) first, then newest first. */
+function sortByRoomAndRecency(entries: MemoryEntry[]): MemoryEntry[] {
+    return [...entries].sort((a, b) => {
+        const roomWeightA = a.room === "attic" ? 0 : 1;
+        const roomWeightB = b.room === "attic" ? 0 : 1;
+        if (roomWeightA !== roomWeightB) return roomWeightB - roomWeightA;
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
 }
 
 /** Pick entries in order until token budget is exhausted. */
