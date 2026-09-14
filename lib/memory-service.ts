@@ -53,10 +53,13 @@ export async function retrieveMemoriesForPrompt(
         }
     }
 
-    // Strategy 3: no embedding support → newest first, fill by budget
-    const sorted = [...longTermEntries].sort(
-        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-    );
+    // Strategy 3: no embedding support → living_room (active) first, then by recency
+    const sorted = [...longTermEntries].sort((a, b) => {
+        const roomWeightA = a.room === "attic" ? 0 : 1;
+        const roomWeightB = b.room === "attic" ? 0 : 1;
+        if (roomWeightA !== roomWeightB) return roomWeightB - roomWeightA;
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
     return fillByBudget(sorted, budget);
 }
 
