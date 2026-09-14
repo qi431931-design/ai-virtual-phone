@@ -4,6 +4,8 @@ export type MusicChatSharePayload = {
     artist: string;
     lyrics?: string;
     isTogether?: boolean;
+    /** 指定收件角色：带上它时直接进入该角色的聊天室，而不是弹联系人列表 */
+    contactId?: string;
 };
 
 export type XiaohongshuNoteChatSharePayload = {
