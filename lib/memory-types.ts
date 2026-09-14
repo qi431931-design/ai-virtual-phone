@@ -14,6 +14,27 @@ export type MemoryEntry = {
     updatedAt: string;
     sourceMessageIds?: string[];
     metadata?: Record<string, unknown>;
+    /** SullyOS memory room: living_room (active high-frequency) or attic (cold archive) */
+    room?: "living_room" | "attic";
+    /** Last accessed timestamp for frequency / decay calculation */
+    lastAccessedAt?: string;
+    /** Number of times recalled / accessed */
+    accessCount?: number;
+};
+
+/** SullyOS EventBox: grouped & compressed episode memory */
+export type EventBox = {
+    id: string;
+    characterId: string;
+    title: string;
+    tags: string[];
+    status: "active" | "sealed";
+    summary: string;
+    memberEntryIds: string[];
+    eventCount: number;
+    createdAt: string;
+    updatedAt: string;
+    sealedAt?: string;
 };
 
 export type MemoryConfig = {
@@ -21,6 +42,14 @@ export type MemoryConfig = {
     autoBuildCoreEnabled: boolean;          // whether core memories rebuild after long-term summarization
     vectorRecallEnabled: boolean;           // whether vector embedding recall is used for memory retrieval
     maxLongTermEntries: number;
+    /** Max entries kept in living_room before decaying eviction to attic (default 200) */
+    maxLivingRoomEntries?: number;
+    /** Hourly decay rate for effective importance calculation (default 0.995) */
+    importanceDecayRatePerHour?: number;
+    /** Max events per EventBox before sealing (default 12) */
+    eventBoxMaxEvents?: number;
+    /** Incremental summarization threshold for active EventBox (default 4) */
+    eventBoxCompressThreshold?: number;
     summarizationEventInterval: number;     // trigger summarization every N events
     coreSummarizationInterval: number;      // trigger core-memory rebuild every N new long-term memories
     shortTermTokenBudget: number;           // token limit for short-term event log
@@ -108,6 +137,10 @@ export const DEFAULT_MEMORY_CONFIG: MemoryConfig = {
     autoBuildCoreEnabled: true,
     vectorRecallEnabled: true,
     maxLongTermEntries: 500,
+    maxLivingRoomEntries: 200,
+    importanceDecayRatePerHour: 0.995,
+    eventBoxMaxEvents: 12,
+    eventBoxCompressThreshold: 4,
     summarizationEventInterval: 80,
     coreSummarizationInterval: 5,
     shortTermTokenBudget: 100000,

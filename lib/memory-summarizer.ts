@@ -20,6 +20,8 @@ import { loadNativeTimeline, formatTimelineForSummarization, filterTimelineByAll
 import { generateEmbedding, resolveEmbeddingModel } from "./memory-embedding";
 import { simpleLLMCall } from "./api-helpers";
 import { maybeRunCoreMemoryPipeline } from "./core-memory-builder";
+import { sanitizeMemorySummary, isSummaryContaminated, evictLivingRoomEntries } from "./memory-guard";
+import { ingestEntryToEventBox } from "./event-box-service";
 
 /** Per-character lock to prevent concurrent summarization. */
 const summarizingSet = new Set<string>();
@@ -118,7 +120,14 @@ export async function runSummarizationPipeline(
         return { success: false, error: "记忆总结结果疑似被截断，已取消入库，请稍后重试或提高模型输出上限" };
     }
 
-    const summary = result.content;
+    // SullyOS Purity Guard: Clean thinking tags & commentary, reject if heavily contaminated
+    const cleanSummary = sanitizeMemorySummary(result.content);
+    if (isSummaryContaminated(cleanSummary)) {
+        console.warn("[MemorySummarizer] Summary rejected due to reasoning/prompt contamination:", cleanSummary);
+        return { success: false, error: "记忆总结包含推理泄露或格式标记，已拦截重试" };
+    }
+
+    const summary = cleanSummary;
 
     // Generate embedding for the summary (only if vector recall is enabled)
     let embedding: number[] | undefined;
@@ -163,17 +172,40 @@ export async function runSummarizationPipeline(
             timeSpan: `${earliest} ~ ${latest}`,
             sourceSessionIds,
         },
+        room: "living_room",
+        accessCount: 1,
+        lastAccessedAt: now,
     };
     await saveMemoryEntry(longTermEntry);
+
+    // SullyOS EventBox integration: Ingest new memory into active event box
+    try {
+        ingestEntryToEventBox(characterId, longTermEntry, {
+            maxEvents: config.eventBoxMaxEvents ?? 12,
+        });
+    } catch (e) {
+        console.warn("[MemorySummarizer] Failed to ingest into EventBox:", e);
+    }
 
     // Update last summarized timestamp + reset counter
     setLastSummarizedTimestamp(characterId, latest);
     resetEventCounter(characterId);
 
-    // Enforce long-term limit
+    // SullyOS Living Room Eviction & Decay
     const allLongTerm = await loadMemoryEntries(characterId);
-    if (allLongTerm.length > config.maxLongTermEntries) {
-        const excess = allLongTerm.slice(0, allLongTerm.length - config.maxLongTermEntries);
+    const maxLivingRoom = config.maxLivingRoomEntries ?? 200;
+    const decayRate = config.importanceDecayRatePerHour ?? 0.995;
+    const { updatedEntries, demotedCount } = evictLivingRoomEntries(allLongTerm, maxLivingRoom, decayRate);
+    if (demotedCount > 0) {
+        for (const demoted of updatedEntries.filter(e => e.room === "attic")) {
+            await saveMemoryEntry(demoted);
+        }
+        console.log(`[MemorySummarizer] Evicted ${demotedCount} entries from living_room to attic`);
+    }
+
+    // Enforce total long-term limit
+    if (updatedEntries.length > config.maxLongTermEntries) {
+        const excess = updatedEntries.slice(0, updatedEntries.length - config.maxLongTermEntries);
         await deleteMemoryEntries(excess.map(e => e.id));
     }
 
