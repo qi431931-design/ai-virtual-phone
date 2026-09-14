@@ -951,7 +951,7 @@ export function MemoryBankPage({ view, selectedCharId, onSelectChar, onNotice }:
                                                             await saveMemoryEntry(entry);
                                                             count++;
                                                         }
-                                                    } else if (typeof parsed === "object") {
+                                                    } else if (parsed && typeof parsed === "object") {
                                                         // 格式 2: 纯键值文本或单条条目
                                                         for (const [k, val] of Object.entries(parsed)) {
                                                             if (typeof val === "string" && val.trim()) {
