@@ -1,7 +1,7 @@
 "use client";
 
 import { Component, useState, useEffect, useCallback, type CSSProperties, type ReactNode } from "react";
-import { Trash2, Zap, Clock, Users, Archive, AlertCircle, Search, Brain, FileText, MoreHorizontal, Plus, Edit3, X, Check, ChevronRight, Filter, type LucideIcon } from "lucide-react";
+import { Trash2, Zap, Clock, Users, Archive, AlertCircle, Search, Brain, FileText, MoreHorizontal, Plus, Edit3, X, Check, ChevronRight, Filter, UploadCloud, type LucideIcon } from "lucide-react";
 import { ConfirmDialog } from "@/components/ui/modal";
 import { MemoryTimeline } from "./memory-timeline";
 import { Toggle } from "@/components/ui/form";
@@ -904,6 +904,89 @@ export function MemoryBankPage({ view, selectedCharId, onSelectChar, onNotice }:
                                         <Archive size={12} className="mr-1" />
                                         {rebuildingCore ? "处理中..." : "重建"}
                                     </button>
+                                </div>
+                            </div>
+                            <div className="menu-item">
+                                <MemorySettingsIcon icon={UploadCloud} color={BINDING_ACCENTS.identity} />
+                                <div className="menu-label-group">
+                                    <span className="menu-label">导入记忆文件</span>
+                                    <span className="menu-desc">支持虚拟手机导出的 JSON 或 SullyOS 记忆宫殿节点</span>
+                                </div>
+                                <div className="menu-right">
+                                    <label className="ui-btn ui-btn-outline py-1 px-3 ts-12 cursor-pointer inline-flex items-center">
+                                        <UploadCloud size={12} className="mr-1" />
+                                        <span>导入</span>
+                                        <input
+                                            type="file"
+                                            accept=".json"
+                                            className="hidden"
+                                            style={{ display: "none" }}
+                                            onChange={async (e) => {
+                                                const file = e.target.files?.[0];
+                                                if (!file || !selectedCharId) return;
+                                                try {
+                                                    const text = await file.text();
+                                                    const parsed = JSON.parse(text);
+                                                    let count = 0;
+                                                    const now = new Date().toISOString();
+
+                                                    // 格式 1: SullyOS 记忆宫殿节点 (MemoryNode[] 或 { nodes: ... })
+                                                    const sullyNodes = Array.isArray(parsed) ? parsed : parsed.nodes || parsed.memoryNodes || parsed.memories;
+                                                    if (Array.isArray(sullyNodes)) {
+                                                        for (const node of sullyNodes) {
+                                                            const content = node.content || node.text || node.summary || node.raw;
+                                                            if (typeof content !== "string" || !content.trim()) continue;
+                                                            const isAttic = node.room === "attic" || node.archived;
+                                                            const entry: MemoryEntry = {
+                                                                id: node.id || `mem_import_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+                                                                characterId: selectedCharId,
+                                                                sourceApp: "chat",
+                                                                type: node.type === "core" ? "core" : "long_term",
+                                                                content: content.trim(),
+                                                                importance: typeof node.importance === "number" ? node.importance : 0.8,
+                                                                createdAt: node.createdAt || node.timestamp || now,
+                                                                updatedAt: now,
+                                                                room: isAttic ? "attic" : "living_room",
+                                                            };
+                                                            await saveMemoryEntry(entry);
+                                                            count++;
+                                                        }
+                                                    } else if (typeof parsed === "object") {
+                                                        // 格式 2: 纯键值文本或单条条目
+                                                        for (const [k, val] of Object.entries(parsed)) {
+                                                            if (typeof val === "string" && val.trim()) {
+                                                                const entry: MemoryEntry = {
+                                                                    id: `mem_import_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+                                                                    characterId: selectedCharId,
+                                                                    sourceApp: "chat",
+                                                                    type: "long_term",
+                                                                    content: `${k}: ${val.trim()}`,
+                                                                    importance: 0.8,
+                                                                    createdAt: now,
+                                                                    updatedAt: now,
+                                                                    room: "living_room",
+                                                                };
+                                                                await saveMemoryEntry(entry);
+                                                                count++;
+                                                            }
+                                                        }
+                                                    }
+
+                                                    if (count > 0) {
+                                                        showNotice(`成功导入 ${count} 条记忆`);
+                                                        loadDetailData(selectedCharId);
+                                                        loadCharacterList();
+                                                    } else {
+                                                        showNotice("未能识别有效记忆格式");
+                                                    }
+                                                } catch (err) {
+                                                    console.error("[MemoryImport] Failed:", err);
+                                                    showNotice("导入失败: 解析 JSON 发生错误");
+                                                }
+                                                e.target.value = "";
+                                            }}
+                                        />
+                                    </label>
                                 </div>
                             </div>
                         </div>
