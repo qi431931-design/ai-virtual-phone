@@ -563,9 +563,37 @@ export default function MusicPlayer() {
                         </div>
                         <div className="mp-lyric-peek">
                             {togetherChar && (
-                                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/40 backdrop-blur-md text-xs text-white/90 mb-2 border border-white/10 shadow-sm animate-pulse">
-                                    <span className="w-2 h-2 rounded-full bg-green-400 inline-block" />
-                                    <span>正在与 {togetherChar.name} 一起听</span>
+                                <div
+                                    className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full mb-2.5 cursor-pointer select-none transition-all active:scale-95"
+                                    style={{
+                                        background: "linear-gradient(135deg, rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0.05))",
+                                        backdropFilter: "blur(16px)",
+                                        WebkitBackdropFilter: "blur(16px)",
+                                        border: "1px solid rgba(255, 255, 255, 0.18)",
+                                        boxShadow: "0 4px 16px rgba(0, 0, 0, 0.25)",
+                                    }}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        // Directly open mini-chat and inject current song context
+                                        window.dispatchEvent(new CustomEvent("open-mini-chat", {
+                                            detail: {
+                                                contactId: togetherChar.id,
+                                                initialText: `我们正在一起听《${track.title}》 - ${track.artist || "未知歌手"}，这首歌感觉怎么样？`,
+                                            }
+                                        }));
+                                    }}
+                                    title="点击与角色边听边聊"
+                                >
+                                    <span className="relative flex h-2 w-2">
+                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400" />
+                                    </span>
+                                    <span className="text-xs font-medium tracking-wide text-white/95">
+                                        与 {togetherChar.name} 一起听中
+                                    </span>
+                                    <span className="text-[10px] text-white/60 bg-white/10 px-1.5 py-0.5 rounded-full">
+                                        边听边聊 💬
+                                    </span>
                                 </div>
                             )}
                             {activeLyricText ? (
@@ -789,10 +817,13 @@ export default function MusicPlayer() {
                                         onClick={() => {
                                             setTogetherChar(c);
                                             setShowTogetherPicker(false);
-                                            showMusicToast(`已邀请 ${c.name} 一起听《${track.title}》`);
-                                            // Dispatch event for chat / timeline
-                                            window.dispatchEvent(new CustomEvent("music-listen-together", {
-                                                detail: { characterId: c.id, trackTitle: track.title, artist: track.artist }
+                                            showMusicToast(`已与 ${c.name} 开启一起听`);
+                                            // Open mini chat immediately with song context
+                                            window.dispatchEvent(new CustomEvent("open-mini-chat", {
+                                                detail: {
+                                                    contactId: c.id,
+                                                    initialText: `正在和你一起听《${track.title}》 - ${track.artist || "未知歌手"} 🎧`,
+                                                }
                                             }));
                                         }}
                                     >
