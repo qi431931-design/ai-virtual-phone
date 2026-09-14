@@ -579,8 +579,7 @@ export default function MusicPlayer() {
                                             .split("\n")
                                             .map(l => l.trim())
                                             .filter(Boolean)
-                                            .slice(0, 10)
-                                            .join("\n");
+                                            .join(" ");
 
                                         // Directly open mini-chat with music payload
                                         window.dispatchEvent(new CustomEvent("open-mini-chat", {
@@ -832,14 +831,13 @@ export default function MusicPlayer() {
                                             setTogetherChar(c);
                                             setShowTogetherPicker(false);
                                             showMusicToast(`已与 ${c.name} 开启一起听`);
-                                            // Extract clean lyrics snippet without timestamps
+                                            // Extract clean full lyrics without timestamps
                                             const cleanLyrics = (track.lyrics || "")
                                                 .replace(/\[\d+:\d+(?:\.\d+)?\]/g, "")
                                                 .split("\n")
                                                 .map(l => l.trim())
                                                 .filter(Boolean)
-                                                .slice(0, 10)
-                                                .join("\n");
+                                                .join(" ");
 
                                             // Open mini chat immediately with music share payload + lyrics snippet
                                             window.dispatchEvent(new CustomEvent("open-mini-chat", {
