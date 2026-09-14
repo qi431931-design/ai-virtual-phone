@@ -7,7 +7,8 @@ import { MemoryTimeline } from "./memory-timeline";
 import { Toggle } from "@/components/ui/form";
 import { loadCharacters } from "@/lib/character-storage";
 import type { Character } from "@/lib/character-types";
-import type { MemoryEntry, MemoryConfig } from "@/lib/memory-types";
+import type { MemoryEntry, MemoryConfig, EventBox } from "@/lib/memory-types";
+import { loadEventBoxes } from "@/lib/event-box-service";
 import { DEFAULT_CORE_MEMORY_PROMPT, DEFAULT_SUMMARIZATION_PROMPT } from "@/lib/memory-types";
 import {
     loadMemoryConfig,
@@ -30,7 +31,7 @@ import { generateEmbedding, resolveEmbeddingModel } from "@/lib/memory-embedding
 import { BINDING_ACCENTS } from "@/lib/ui-accent-colors";
 
 type MemoryView = "list" | "detail" | "settings";
-type MemoryTab = "short" | "shared" | "core" | "long";
+type MemoryTab = "short" | "shared" | "boxes" | "long" | "core";
 type MemoryBudgetKey = "shortTermTokenBudget" | "coreMemoryTokenBudget" | "longTermTokenBudget";
 
 const MEMORY_TOKEN_BUDGET_MAX = 100000;
@@ -189,6 +190,7 @@ export function MemoryBankPage({ view, selectedCharId, onSelectChar, onNotice }:
     const [activeTab, setActiveTab] = useState<MemoryTab>("short");
     const [coreEntries, setCoreEntries] = useState<MemoryEntry[]>([]);
     const [longTermEntries, setLongTermEntries] = useState<MemoryEntry[]>([]);
+    const [eventBoxes, setEventBoxes] = useState<EventBox[]>([]);
     const [shortTermEvents, setShortTermEvents] = useState<NativeTimelineEntry[]>([]);
     const [sharedEvents, setSharedEvents] = useState<NativeTimelineEntry[]>([]);
     const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -278,6 +280,7 @@ export function MemoryBankPage({ view, selectedCharId, onSelectChar, onNotice }:
             ]);
             setCoreEntries(core);
             setLongTermEntries(lt);
+            setEventBoxes(loadEventBoxes(charId));
         } catch {
             setCoreEntries([]);
             setLongTermEntries([]);
@@ -697,6 +700,28 @@ export function MemoryBankPage({ view, selectedCharId, onSelectChar, onNotice }:
                                 userName={resolveUserIdentity(selectedCharId!)?.name || "用户"}
                             />
                         )
+                    ) : activeTab === "boxes" ? (
+                        /* ── SullyOS EventBox Tab ── */
+                        eventBoxes.length === 0 ? (
+                            <p className="text-center ts-14 text-secondary mt-10">暂无事件盒。长期记忆提炼时会自动归拢聚合。</p>
+                        ) : (
+                            <div className="flex flex-col gap-3 pb-24">
+                                {eventBoxes.map(box => (
+                                    <div key={box.id} className="card-surface p-4 rounded-2xl flex flex-col gap-2">
+                                        <div className="flex items-center justify-between">
+                                            <span className="font-medium ts-15 text-primary flex items-center gap-2">
+                                                {box.title}
+                                                <span className={`ts-11 px-2 py-0.5 rounded-full ${box.status === "sealed" ? "bg-secondary text-muted" : "bg-primary text-white"}`}>
+                                                    {box.status === "sealed" ? "已封盒" : "活跃中"}
+                                                </span>
+                                            </span>
+                                            <span className="ts-12 text-secondary">{box.eventCount} 条事件</span>
+                                        </div>
+                                        <p className="ts-13 text-secondary leading-relaxed line-clamp-3">{box.summary}</p>
+                                    </div>
+                                ))}
+                            </div>
+                        )
                     ) : activeTab === "core" ? (
                         renderMemoryEntries("core", coreEntries, "暂无核心记忆。长期记忆累计到设定条数后会自动提炼，也可以手动新增。")
                     ) : (
@@ -711,6 +736,7 @@ export function MemoryBankPage({ view, selectedCharId, onSelectChar, onNotice }:
                     {([
                         { key: "short" as const, icon: Clock, label: "短期" },
                         { key: "shared" as const, icon: Users, label: "共享事件" },
+                        { key: "boxes" as const, icon: Brain, label: "事件盒" },
                         { key: "long" as const, icon: Archive, label: "长期" },
                         { key: "core" as const, icon: Archive, label: "核心" },
                     ]).map(tab => (
