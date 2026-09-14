@@ -64,6 +64,14 @@ export function ingestEntryToEventBox(
         activeBox.memberEntryIds.push(entry.id);
         activeBox.eventCount += 1;
         activeBox.updatedAt = now;
+        // SullyOS Incremental summary update: append new entry snippet with length guard
+        const sanitizedNewContent = sanitizeMemorySummary(entry.content);
+        if (sanitizedNewContent) {
+            const separator = activeBox.summary ? "\n" : "";
+            const combined = `${activeBox.summary}${separator}· ${sanitizedNewContent}`.trim();
+            // Guard against unbounded summary explosion before sealing
+            activeBox.summary = combined.length > 500 ? combined.slice(0, 497) + "..." : combined;
+        }
     }
 
     let sealed = false;
