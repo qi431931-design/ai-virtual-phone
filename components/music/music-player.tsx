@@ -17,6 +17,8 @@ import {
 import MusicCommentsPage from "./music-comments";
 import MusicArtistPage from "./music-artist";
 import { loadMusicBg, playerBgStyle, MUSIC_BG_EVENT, type MusicBgConfig } from "@/lib/music-bg";
+import { loadCharacters } from "@/lib/character-storage";
+import type { Character } from "@/lib/character-types";
 
 const PLAY_MODE_ICONS: Record<PlayMode, { svg: string; label: string }> = {
     sequence: {
@@ -68,6 +70,8 @@ export default function MusicPlayer() {
     const [showQueue, setShowQueue] = useState(false);
     const [showComments, setShowComments] = useState(false);
     const [artistView, setArtistView] = useState<{ id: number; name: string } | null>(null);
+    const [togetherChar, setTogetherChar] = useState<Character | null>(null);
+    const [showTogetherPicker, setShowTogetherPicker] = useState(false);
     const [palette, setPalette] = useState<CoverPalette>(DEFAULT_COVER_PALETTE);
     const [bgCfg, setBgCfg] = useState<MusicBgConfig>(() => loadMusicBg());
     const [commentTotal, setCommentTotal] = useState(0);
@@ -470,6 +474,18 @@ export default function MusicPlayer() {
                             <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
                         </svg>
                     </button>
+                    <button
+                        className={`music-player-ctrl-btn mp-top-btn ${togetherChar ? "text-primary" : ""}`}
+                        onClick={() => setShowTogetherPicker(true)}
+                        title={togetherChar ? `与 ${togetherChar.name} 一起听` : "邀请角色一起听"}
+                    >
+                        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                            <circle cx="9" cy="7" r="4" />
+                            <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+                            <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                        </svg>
+                    </button>
                     <button className="music-player-ctrl-btn mp-top-btn" onClick={openShareViaChat} title="分享到聊天">
                         <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                             <circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" />
@@ -546,6 +562,12 @@ export default function MusicPlayer() {
                             )}
                         </div>
                         <div className="mp-lyric-peek">
+                            {togetherChar && (
+                                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/40 backdrop-blur-md text-xs text-white/90 mb-2 border border-white/10 shadow-sm animate-pulse">
+                                    <span className="w-2 h-2 rounded-full bg-green-400 inline-block" />
+                                    <span>正在与 {togetherChar.name} 一起听</span>
+                                </div>
+                            )}
                             {activeLyricText ? (
                                 <>「{activeLyricText}」<span>点击查看歌词</span></>
                             ) : hasLyrics ? (
@@ -722,6 +744,75 @@ export default function MusicPlayer() {
                                     </div>
                                 </button>
                             ))}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Character Together Picker overlay */}
+            {showTogetherPicker && (
+                <div className="music-playlist-picker-overlay" onClick={() => setShowTogetherPicker(false)}>
+                    <div className="music-playlist-picker" onClick={e => e.stopPropagation()} style={{ maxHeight: "65vh" }}>
+                        <div className="music-playlist-picker-header">
+                            <span>邀请角色一起听</span>
+                            <button className="music-playlist-picker-close" onClick={() => setShowTogetherPicker(false)}>
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                            </button>
+                        </div>
+                        <div className="music-playlist-picker-list">
+                            {togetherChar && (
+                                <button
+                                    className="music-playlist-picker-item"
+                                    style={{ borderBottom: "1px solid rgba(255,255,255,0.08)", marginBottom: 6 }}
+                                    onClick={() => {
+                                        setTogetherChar(null);
+                                        setShowTogetherPicker(false);
+                                        showMusicToast("已结束一起听");
+                                    }}
+                                >
+                                    <div className="w-10 h-10 rounded-full bg-red-500/20 text-red-400 flex items-center justify-center font-bold text-xs shrink-0">
+                                        结束
+                                    </div>
+                                    <div className="music-playlist-picker-info text-left">
+                                        <div className="music-playlist-picker-name text-red-400">退出当前一起听</div>
+                                        <div className="music-playlist-picker-count">恢复单人播放模式</div>
+                                    </div>
+                                </button>
+                            )}
+                            {loadCharacters().map(c => {
+                                const isCurrent = togetherChar?.id === c.id;
+                                return (
+                                    <button
+                                        key={c.id}
+                                        className="music-playlist-picker-item"
+                                        style={isCurrent ? { background: "rgba(255,255,255,0.1)" } : undefined}
+                                        onClick={() => {
+                                            setTogetherChar(c);
+                                            setShowTogetherPicker(false);
+                                            showMusicToast(`已邀请 ${c.name} 一起听《${track.title}》`);
+                                            // Dispatch event for chat / timeline
+                                            window.dispatchEvent(new CustomEvent("music-listen-together", {
+                                                detail: { characterId: c.id, trackTitle: track.title, artist: track.artist }
+                                            }));
+                                        }}
+                                    >
+                                        {c.avatar ? (
+                                            <img src={c.avatar} alt="" className="music-playlist-picker-cover rounded-full object-cover" />
+                                        ) : (
+                                            <div className="w-10 h-10 rounded-full bg-neutral-700 text-white flex items-center justify-center font-bold text-xs shrink-0">
+                                                {c.name.slice(0, 1)}
+                                            </div>
+                                        )}
+                                        <div className="music-playlist-picker-info text-left">
+                                            <div className="music-playlist-picker-name flex items-center gap-1.5">
+                                                <span>{c.name}</span>
+                                                {isCurrent && <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-500/20 text-green-400">进行中</span>}
+                                            </div>
+                                            <div className="music-playlist-picker-count">{c.description || "点击邀请一起听歌"}</div>
+                                        </div>
+                                    </button>
+                                );
+                            })}
                         </div>
                     </div>
                 </div>
