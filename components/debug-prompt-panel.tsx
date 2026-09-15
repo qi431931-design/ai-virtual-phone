@@ -44,15 +44,13 @@ import { fetchNoteWall, fetchNoteWallComments } from "@/lib/notewall-client";
 import { previewNoteWallPromptPayload, type NoteWallReplyCandidate } from "@/lib/notewall-engine";
 import { loadXiaohongshuState } from "@/lib/xiaohongshu-storage";
 import { previewXiaohongshuPromptPayload } from "@/lib/xiaohongshu-engine";
-import { loadCoCreateSession } from "@/lib/cocreate-storage";
-import { previewCoCreatePromptPayload } from "@/lib/cocreate-engine";
-import { previewShoppingPromptPayload } from "@/lib/shopping-engine";
+// (cocreate/shopping debug prompt imports removed)
 import { previewInterviewMagazinePromptPayload } from "@/lib/interview-magazine-engine";
 import { hydrateMapStorage, loadMapWorlds, getLatestSave } from "@/lib/map-storage";
 import { previewAdventureCompanionPromptPayload } from "@/lib/map-rpg-engine";
 import { resolveUserIdentity } from "@/lib/settings-storage";
 import type { BookChapter } from "@/lib/reading-types";
-import type { CoCreateMode } from "@/lib/cocreate-types";
+// import type { CoCreateMode } from "@/lib/cocreate-types";
 import type { MapWorld, GameSave } from "@/lib/map-types";
 
 
@@ -561,11 +559,8 @@ export function DebugPromptPanel() {
             } else if (extraAppId === "xiaohongshu") {
                 const state = loadXiaohongshuState();
                 result = await previewXiaohongshuPromptPayload(extraCharacterId, xiaohongshuMode, state.notes, state.settings);
-            } else if (extraAppId === "cocreate") {
-                const session = loadCoCreateSession(extraCharacterId);
-                result = await previewCoCreatePromptPayload(session, coCreateMode);
-            } else if (extraAppId === "shopping") {
-                result = await previewShoppingPromptPayload(shoppingMode, { query: shoppingQuery });
+            } else if (extraAppId === "cocreate" || extraAppId === "shopping") {
+                throw new Error("该功能已移除");
             } else if (extraAppId === "interview") {
                 result = await previewInterviewMagazinePromptPayload({
                     theme: interviewTheme,

@@ -64,8 +64,7 @@ import { formatChatUiTime } from "@/lib/chat-time";
 import { parseActionTags } from "@/lib/action-parser";
 import { kvGet, kvSet, kvRemove } from "@/lib/kv-db";
 import { creditWalletBalance, payWithWalletBalance } from "@/lib/wallet-storage";
-import { loadDeliveredShoppingGifts, type ShoppingGiftCandidate } from "@/lib/shopping-gift-utils";
-import { settleShoppingPaymentRequest } from "@/lib/shopping-payment-request";
+// (shopping imports removed)
 import type { RegexConfig } from "@/lib/settings-types";
 import { MacroEngine } from "@/lib/macro-engine";
 import {
