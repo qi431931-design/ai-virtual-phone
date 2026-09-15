@@ -35,11 +35,11 @@ import { MascotPreviewHost } from "@/components/mascot/mascot-preview-host";
 import { useMusicControlsOptional } from "@/lib/music-context";
 import { PhoneResourcesApp, type ResourceSubPage } from "@/components/phone-resources-app";
 import { CheckPhoneApp } from "@/components/checkphone/checkphone-app";
-import { ShoppingApp } from "@/components/shopping/shopping-app";
+
 import { GameHubApp } from "@/components/game/game-hub-app";
 import { MixologyApp } from "@/components/mixology/mixology-app";
 import InterviewMagazineApp from "@/components/interview/interview-magazine-app";
-import { CoCreateApp } from "@/components/cocreate/cocreate-app";
+
 import { AppMarketApp } from "@/components/app-market/app-market-app";
 import { CustomAppRunner } from "@/components/app-market/custom-app-runner";
 import { CustomAppForegroundBoundary } from "@/components/app-market/custom-app-failure";
@@ -1081,11 +1081,7 @@ export function DesktopShell({ initialThemeProfile, initialThemeAssets }: Deskto
   const [dwellingMounted, setDwellingMounted] = useState(false);
   const [xiaohongshuMounted, setXiaohongshuMounted] = useState(false);
   const [xiaohongshuBusy, setXiaohongshuBusy] = useState(false);
-  const [shoppingMounted, setShoppingMounted] = useState(false);
-  const [shoppingBusy, setShoppingBusy] = useState(false);
-  if (activeApp === "dwelling" && !dwellingMounted) setDwellingMounted(true);
-  if (activeApp === "xiaohongshu" && !xiaohongshuMounted) setXiaohongshuMounted(true);
-  if (activeApp === "shopping" && !shoppingMounted) setShoppingMounted(true);
+
   const [widgets, setWidgets] = useState<WidgetInstance[]>([]);
   const [incomingCall, setIncomingCall] = useState<{
     sessionId: string; type: "voice" | "video"; charName: string; charAvatar: string | null; isGroup?: boolean;
@@ -4117,9 +4113,7 @@ html,body{margin:0;padding:0;width:100%;height:100%;background:#121110;color:rgb
       return <InterviewMagazineApp onClose={() => setActiveApp(null)} />;
     }
 
-    if (activeApp === "cocreate") {
-      return <CoCreateApp onClose={() => setActiveApp(null)} onNotice={setNotice} />;
-    }
+
 
     return activeApp in ICONS
       ? <PhonePlaceholderApp icon={ICONS[activeApp as IconId]} onClose={() => setActiveApp(null)} />
@@ -4691,7 +4685,7 @@ html,body{margin:0;padding:0;width:100%;height:100%;background:#121110;color:rgb
                   </>
                 ) : (
                   <>
-                    <section className="phone-app-pane" style={activeApp === "dwelling" || activeApp === "xiaohongshu" || activeApp === "shopping" ? { display: "none" } : undefined}>
+                    <section className="phone-app-pane" style={activeApp === "dwelling" || activeApp === "xiaohongshu" ? { display: "none" } : undefined}>
                       {renderAppBody()}
                     </section>
                     {/* DwellingApp stays mounted while generating — auto-unmounts when idle */}
@@ -4722,21 +4716,7 @@ html,body{margin:0;padding:0;width:100%;height:100%;background:#121110;color:rgb
                     />
                   </section>
                 )}
-                {shoppingMounted && (
-                  <section className="phone-app-pane" style={activeApp !== "shopping" ? { display: "none" } : undefined}>
-                    <ShoppingApp
-                      onClose={handleCloseShopping}
-                      visible={activeApp === "shopping"}
-                      onBusyChange={setShoppingBusy}
-                      onIdle={() => {
-                        if (activeApp !== "shopping") {
-                          setShoppingBusy(false);
-                          setShoppingMounted(false);
-                        }
-                      }}
-                    />
-                  </section>
-                )}
+
               </div>
 
               {!activeApp ? (

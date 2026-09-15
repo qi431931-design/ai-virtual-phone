@@ -5,14 +5,12 @@ export type IconId =
   | "diary"
   | "music"
   | "reading"
-  | "cocreate"
   | "story"
   | "game"
   | "appmarket"
   | "xiaohongshu"
   | "dwelling"
   | "checkphone"
-  | "shopping"
   | "calendar"
   | "interview_magazine"
   | "vnmode"
@@ -55,10 +53,9 @@ export type IconMeta = {
   path?: string;
 };
 
-export const PAGE_1_DEFAULT: IconId[] = ["chat", "diary", "music", "calendar", "checkphone", "shopping", "reading", "interview_magazine"];
+export const PAGE_1_DEFAULT: IconId[] = ["chat", "diary", "music", "calendar", "checkphone", "reading", "interview_magazine"];
 
 export const PAGE_2_DEFAULT: IconId[] = [
-  "cocreate",
   "game",
   "appmarket",
   "xiaohongshu",
@@ -78,7 +75,7 @@ export const ICONS: Record<IconId, IconMeta> = {
   diary: { id: "diary", label: "手记", tone: "var(--c-icon-violet)", placeholder: false },
   music: { id: "music", label: "\u97F3\u4E50", tone: "var(--c-icon-coral)", placeholder: false },
   reading: { id: "reading", label: "\u9605\u8BFB", tone: "var(--c-icon-amber)", placeholder: false },
-  cocreate: { id: "cocreate", label: "共创", tone: "var(--c-icon-cocreate, #c8b58a)", placeholder: false },
+
   story: { id: "story", label: "\u5267\u60C5", tone: "var(--c-icon-story, #8b6f52)", placeholder: false },
   game: { id: "game", label: "游戏", tone: "var(--c-icon-blue)", placeholder: false },
   appmarket: { id: "appmarket", label: "应用市场", tone: "var(--c-icon-teal)", placeholder: false },
@@ -95,8 +92,6 @@ export const ICONS: Record<IconId, IconMeta> = {
     tone: "var(--c-icon-rose)",
     placeholder: false
   },
-  shopping: { id: "shopping", label: "\u8D2D\u7269", tone: "var(--c-icon-amber)", placeholder: false },
-  calendar: { id: "calendar", label: "\u65E5\u5386", tone: "var(--c-icon-rose)", placeholder: true },
   interview_magazine: { id: "interview_magazine", label: "在场", tone: "var(--c-icon-lilac)", placeholder: false },
   vnmode: { id: "vnmode", label: "漫卷", tone: "var(--c-icon-rose)", placeholder: false },
   mapmode: { id: "mapmode", label: "冒险", tone: "var(--c-icon-amber)", placeholder: false },
