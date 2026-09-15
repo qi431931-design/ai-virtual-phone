@@ -37,7 +37,7 @@ import { isKnownStickerLabel } from "./sticker-data";
 import { loadCharacters } from "./character-storage";
 import { bgSetInterval, bgSetTimeout } from "./bg-timer";
 import { dispatchChatMessageNotice } from "./chat-notification-events";
-import { settleShoppingPaymentRequest } from "./shopping-payment-request";
+// (settleShoppingPaymentRequest removed)
 import {
     createPendingChatGeneratedImageData,
     generateAndApplyChatGeneratedImage,
