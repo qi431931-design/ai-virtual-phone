@@ -427,7 +427,7 @@ export function MemoryBankPage({ view, selectedCharId, onSelectChar, onNotice }:
 
     const saveInterval = (value: number) => {
         if (!Number.isFinite(value)) return;
-        const nextValue = Math.min(200, Math.max(10, Math.round(value)));
+        const nextValue = Math.min(200, Math.max(1, Math.round(value)));
         const next = { ...config, summarizationEventInterval: nextValue };
         setConfig(next);
         saveMemoryConfig(next);
@@ -1161,9 +1161,9 @@ export function MemoryBankPage({ view, selectedCharId, onSelectChar, onNotice }:
                         label="总结间隔"
                         desc="每 N 条事件自动触发总结"
                         value={config.summarizationEventInterval ?? 50}
-                        min={10}
+                        min={1}
                         max={200}
-                        step={10}
+                        step={1}
                         onChange={saveInterval}
                     />
                     <MemorySettingsSliderItem
