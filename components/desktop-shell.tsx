@@ -2407,6 +2407,9 @@ html,body{margin:0;padding:0;width:100%;height:100%;background:#121110;color:rgb
     return () => window.removeEventListener("open-app", handler);
   }, []);
 
+  // Shopping / Cocreate stub busy states to avoid any ReferenceError
+  const [shoppingBusy, setShoppingBusy] = useState(false);
+
   // Mini chat window state
   const [showMiniChat, setShowMiniChat] = useState(false);
   const [miniSharePayload, setMiniSharePayload] = useState<ChatSharePayload | null>(null);
