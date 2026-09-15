@@ -11,6 +11,8 @@ export type IconId =
   | "xiaohongshu"
   | "dwelling"
   | "checkphone"
+  | "shopping"
+  | "cocreate"
   | "calendar"
   | "interview_magazine"
   | "vnmode"
@@ -53,9 +55,10 @@ export type IconMeta = {
   path?: string;
 };
 
-export const PAGE_1_DEFAULT: IconId[] = ["chat", "diary", "music", "calendar", "checkphone", "reading", "interview_magazine"];
+export const PAGE_1_DEFAULT: IconId[] = ["chat", "diary", "music", "calendar", "checkphone", "shopping", "reading", "interview_magazine"];
 
 export const PAGE_2_DEFAULT: IconId[] = [
+  "cocreate",
   "game",
   "appmarket",
   "xiaohongshu",
@@ -86,6 +89,8 @@ export const ICONS: Record<IconId, IconMeta> = {
     placeholder: false
   },
   checkphone: { id: "checkphone", label: "查手机", tone: "var(--c-icon-slate)", placeholder: false },
+  shopping: { id: "shopping", label: "购物", tone: "var(--c-icon-coral)", placeholder: false },
+  cocreate: { id: "cocreate", label: "共创", tone: "var(--c-icon-teal)", placeholder: false },
   dwelling: {
     id: "dwelling",
     label: "栖所",
