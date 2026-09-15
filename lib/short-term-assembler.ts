@@ -23,12 +23,12 @@ import { loadXiaohongshuProjectionEntries } from "./xiaohongshu-memory";
 import { formatXiaohongshuShareForPrompt } from "./chat-share";
 import { loadBlackMarketTheaterProjectionEntries } from "./black-market-storage";
 import { loadInterviewMagazineProjectionEntries } from "./interview-magazine-memory";
-import { loadCoCreateProjectionEntries } from "./cocreate-memory";
+// import { loadCoCreateProjectionEntries } from "./cocreate-memory";
 import { stripStateAndInnerForPrompt } from "./prompt-sanitizer";
 import { renderUserNameMacro } from "./user-macro";
 import { loadChatOfflineProjectionEntries } from "./chat-offline-storage";
 import { loadCheckPhoneProjectionEntries } from "./checkphone-storage";
-import { formatShoppingPaymentRequestHistory } from "./shopping-payment-request";
+// import { formatShoppingPaymentRequestHistory } from "./shopping-payment-request";
 import { loadCustomAppTimelineEntries } from "./custom-app-storage";
 import {
     canCharacterSeeMomentPost,
@@ -243,12 +243,7 @@ export function loadNativeTimeline(
                         ? `[礼物:${giftName}:${msg.mediaData.recipientName}]`
                         : `[礼物:${giftName}]`;
                 }
-                else if (msg.mediaType === "payment_request") content = formatShoppingPaymentRequestHistory({
-                    amount: msg.mediaData?.amount,
-                    amountLabel: msg.mediaData?.paymentRequestAmountLabel,
-                    items: msg.mediaData?.paymentRequestItems,
-                    itemsText: msg.mediaData?.paymentRequestItemsText,
-                });
+                else if (msg.mediaType === "payment_request") content = `[代付:${msg.mediaData?.paymentRequestAmountLabel || msg.mediaData?.amount || 0}]`;
                 else if (msg.mediaType === "music_share") content = `[音乐分享:${msg.mediaData?.musicTitle || ""}]`;
                 else if (msg.mediaType === "xiaohongshu_note_share") content = formatXiaohongshuShareForPrompt({
                     author: msg.mediaData?.xiaohongshuAuthor,
@@ -346,12 +341,7 @@ export function loadNativeTimeline(
                         ? `[礼物:${giftName}:${msg.mediaData.recipientName}]`
                         : `[礼物:${giftName}]`;
                 }
-                else if (msg.mediaType === "payment_request") content = formatShoppingPaymentRequestHistory({
-                    amount: msg.mediaData?.amount,
-                    amountLabel: msg.mediaData?.paymentRequestAmountLabel,
-                    items: msg.mediaData?.paymentRequestItems,
-                    itemsText: msg.mediaData?.paymentRequestItemsText,
-                });
+                else if (msg.mediaType === "payment_request") content = `[代付:${msg.mediaData?.paymentRequestAmountLabel || msg.mediaData?.amount || 0}]`;
                 else if (msg.mediaType === "app_card") {
                     const appName = msg.mediaData?.appName || "APP";
                     const title = msg.mediaData?.appCardTitle || msg.mediaData?.label || "应用卡片";
@@ -741,26 +731,7 @@ export function loadNativeTimeline(
         });
     }
 
-    // ── Co-create projections ──
-    const cocreateEntries = loadCoCreateProjectionEntries(characterId, {
-        afterTimestamp: options?.afterTimestamp,
-    });
-    for (const cocreateEntry of cocreateEntries) {
-        entries.push({
-            id: cocreateEntry.id,
-            sourceApp: "cocreate",
-            sourceDetail: "cocreate_project",
-            authorType: "character",
-            sessionId: cocreateEntry.sessionId,
-            timestamp: cocreateEntry.timestamp,
-            content: formatStoredPromptEventContent(cocreateEntry.content, {
-                label: "共创",
-                timestamp: cocreateEntry.timestamp,
-                timeAware,
-                timestampOptions,
-            }),
-        });
-    }
+    // ── Co-create projections (removed) ──
 
     // ── Custom app timeline events ──
     const customAppEntries = loadCustomAppTimelineEntries(characterId, {
