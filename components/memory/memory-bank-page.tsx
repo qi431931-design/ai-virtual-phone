@@ -626,28 +626,7 @@ export function MemoryBankPage({ view, selectedCharId, onSelectChar, onNotice }:
                                     <span className={`mem-origin-badge ${isManualMemoryEntry(entry) ? "is-manual" : ""}`}>
                                         {isManualMemoryEntry(entry) ? "MANUAL" : "AUTO"}
                                     </span>
-                                    <span
-                                        className="mem-origin-badge"
-                                        style={{
-                                            fontSize: "9px",
-                                            letterSpacing: "0.5px",
-                                            padding: "1px 5px",
-                                            borderRadius: "4px",
-                                            fontWeight: 600,
-                                            background: Array.isArray(entry.embedding) && entry.embedding.length > 0
-                                                ? "rgba(34, 197, 94, 0.15)"
-                                                : "rgba(148, 163, 184, 0.15)",
-                                            color: Array.isArray(entry.embedding) && entry.embedding.length > 0
-                                                ? "rgb(34, 197, 94)"
-                                                : "var(--c-text-muted, #94a3b8)",
-                                            border: Array.isArray(entry.embedding) && entry.embedding.length > 0
-                                                ? "1px solid rgba(34, 197, 94, 0.3)"
-                                                : "1px solid rgba(148, 163, 184, 0.2)"
-                                        }}
-                                        title={Array.isArray(entry.embedding) && entry.embedding.length > 0 ? `已向量化 (${entry.embedding.length} 维)` : "未生成向量 (使用关键词检索)"}
-                                    >
-                                        {Array.isArray(entry.embedding) && entry.embedding.length > 0 ? `VEC (${entry.embedding.length})` : "NO VEC"}
-                                    </span>
+
                                     <div className="mem-entry-menu-wrap">
                                         <button
                                             className="mem-entry-menu-btn"
