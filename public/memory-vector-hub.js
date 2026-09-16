@@ -207,6 +207,7 @@ export default {
     }
 
     async function readLongMemories(charId) {
+      if (!charId) return [];
       const db = await idbOpen(MEM_DB);
       try {
         if (!db.objectStoreNames.contains(MEM_STORE)) return [];
@@ -215,7 +216,7 @@ export default {
           const req = tx.objectStore(MEM_STORE).getAll();
           req.onsuccess = () => {
             const all = req.result || [];
-            res(all.filter((r) => r?.type === "long_term" && (!charId || r?.characterId === charId)));
+            res(all.filter((r) => r?.type === "long_term" && r?.characterId === charId));
           };
           req.onerror = () => rej(req.error);
         });
@@ -531,6 +532,11 @@ export default {
 
     ctx.hooks.transform("llm.request", async (payload) => {
       try {
+        // 核心隔离：只拦截常规角色聊天（单聊/群聊），非角色请求（如小卷/小坊/生图/翻译等后台 purpose）或者没有 characterId 的直接放行
+        if (!payload.characterId || (payload.purpose && payload.purpose !== "chat")) {
+          return payload;
+        }
+
         let messages = payload.messages || [];
 
         let currentPrompt = "";
