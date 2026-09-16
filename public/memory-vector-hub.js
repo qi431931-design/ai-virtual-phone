@@ -532,6 +532,7 @@ export default {
 
     ctx.hooks.transform("llm.request", async (payload) => {
       try {
+        ctx.system.log("[记忆中枢] 成功拦截到 LLM 请求！", payload?.sessionId || "无会话");
         let messages = payload.messages || [];
         if (!Array.isArray(messages) || messages.length === 0) return payload;
 
