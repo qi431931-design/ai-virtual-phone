@@ -30,7 +30,7 @@ export default {
     id: "memory-vector-hub",
     name: "记忆向量与重排中枢",
     apiVersion: 1,
-    version: "12.3.0",
+    version: "12.4.0",
     author: "小坊",
     description: "句子级检索 + 向量余弦相似度 + 关键词保送 + 性能与防爆优化。",
     permissions: ["chat.read", "ui", "storage", "network"],
