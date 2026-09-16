@@ -41,6 +41,7 @@ export default {
       { key: "shortTermMinTurns", label: "短期记忆保底轮数 (不足则往前补齐)", type: "number", default: 15 },
       { key: "keywordBoost", label: "关键词保送门槛 (建议 0.45)", type: "number", default: 0.45 },
       { key: "keywordGuaranteeMax", label: "关键词保送名额上限 (建议 1)", type: "number", default: 1 },
+      { key: "showFloatingBall", label: "显示聊天悬浮球（可拖拽贴边）", type: "boolean", default: true },
     ],
   },
 
@@ -1074,37 +1075,50 @@ export default {
       });
     }
 
-    // 聊天窗口内悬浮可拖拽、自动贴边精致小圆球
+    // 聊天窗口内悬浮可拖拽、自动贴边高级半透灰小圆球（支持设置开关）
     ctx.ui.slot("chat.header", (el, props) => {
-      // 避免重复挂载
       const existing = document.getElementById("mvh-floating-ball");
       if (existing) existing.remove();
 
+      // 判断用户是否开启了悬浮球设置
+      const isBallEnabled = ctx.system.settings.get("showFloatingBall") !== false;
+      if (!isBallEnabled) return () => {};
+
       const ball = document.createElement("div");
       ball.id = "mvh-floating-ball";
-      ball.title = "点击查看记忆底稿（可拖拽贴边）";
+      ball.title = "记忆中枢（可拖拽贴边）";
       ball.style.cssText = `
         position: fixed !important;
-        right: 12px !important;
-        bottom: 120px !important;
-        width: 42px !important;
-        height: 42px !important;
+        right: 10px !important;
+        bottom: 130px !important;
+        width: 36px !important;
+        height: 36px !important;
         border-radius: 50% !important;
-        background: linear-gradient(135deg, #6366f1, #8b5cf6) !important;
-        color: #fff !important;
+        background: rgba(30, 41, 59, 0.72) !important;
+        backdrop-filter: blur(10px) !important;
+        -webkit-backdrop-filter: blur(10px) !important;
+        border: 1px solid rgba(255, 255, 255, 0.15) !important;
+        color: #e2e8f0 !important;
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
-        font-size: 20px !important;
-        box-shadow: 0 6px 16px rgba(99,102,241,0.45) !important;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18) !important;
         cursor: grab !important;
         user-select: none !important;
         touch-action: none !important;
         z-index: 99999 !important;
         pointer-events: auto !important;
-        transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s, opacity 0.25s;
+        opacity: 0.85 !important;
+        transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.2s, box-shadow 0.2s;
       `;
-      ball.innerHTML = "🧠";
+      // 使用极简双重微光同心圆环图标，高级简约不突兀
+      ball.innerHTML = `
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="pointer-events:none;">
+          <circle cx="12" cy="12" r="9" stroke-opacity="0.4"></circle>
+          <circle cx="12" cy="12" r="4" fill="currentColor" fill-opacity="0.8"></circle>
+          <path d="M12 3v2M12 19v2M3 12h2M19 12h2" stroke-opacity="0.6"></path>
+        </svg>
+      `;
       document.body.appendChild(ball);
 
       let isDragging = false;
@@ -1149,9 +1163,9 @@ export default {
         const rect = ball.getBoundingClientRect();
         const midX = window.innerWidth / 2;
         if (rect.left + rect.width / 2 < midX) {
-          ball.style.left = "10px"; // 自动贴左边
+          ball.style.left = "8px"; // 自动靠左贴边
         } else {
-          ball.style.left = `${window.innerWidth - 48}px`; // 自动贴右边
+          ball.style.left = `${window.innerWidth - 44}px`; // 自动靠右贴边
         }
       };
 
