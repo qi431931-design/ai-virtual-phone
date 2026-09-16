@@ -30,7 +30,7 @@ export default {
     id: "memory-vector-hub",
     name: "记忆向量与重排中枢",
     apiVersion: 1,
-    version: "12.5.0",
+    version: "12.6.0",
     author: "小坊",
     description: "句子级检索 + 向量余弦相似度 + 关键词保送 + 性能与防爆优化。",
     permissions: ["chat.read", "ui", "storage", "network"],
@@ -595,23 +595,15 @@ export default {
           }
         }
 
-        // 严格定位角色
+        // 角色判定与获取：优先从 payload 获取，若无则从当前全部角色兜底，绝不因为缺少 ID 提前退出
         let targetCharId = payload.characterId || "";
         if (!targetCharId && payload.sessionId) {
           const sess = ctx.data.sessions.get(payload.sessionId);
           targetCharId = sess?.contactId || (sess?.characterIds && sess.characterIds[0]) || "";
         }
         if (!targetCharId) {
-          // 兜底：如果会话里有包含长期记忆标签，取当前正在聊天的第一个角色
-          const hasLongTag = messages.some((m) => typeof m?.content === "string" && m.content.includes("<" + TAG_LONG + ">"));
-          if (hasLongTag) {
-            const chars = ctx.data.characters.list() || [];
-            targetCharId = chars[0]?.id || "";
-          }
-        }
-
-        if (!targetCharId) {
-          return payload;
+          const chars = ctx.data.characters.list() || [];
+          targetCharId = chars[0]?.id || "";
         }
 
         {
