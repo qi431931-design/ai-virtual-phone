@@ -1073,14 +1073,96 @@ export default {
       });
     }
 
-    // 聊天顶部 Header 与 输入栏双入口支持
+    // 聊天窗口内悬浮可拖拽、自动贴边精致小圆球
     ctx.ui.slot("chat.header", (el, props) => {
-      const tag = document.createElement("div");
-      tag.style.cssText = "padding:2px 8px;font-size:10px;cursor:pointer;background:rgba(99,102,241,.12);color:#6366f1;border-radius:6px;display:inline-flex;align-items:center;margin:4px 0;width:fit-content;";
-      tag.innerHTML = "🧠 记忆向量中枢 (点击查看底稿)";
-      tag.onclick = () => openCenterModal(props?.sessionId);
-      el.appendChild(tag);
-      return () => tag.remove();
+      const ball = document.createElement("div");
+      ball.title = "点击查看记忆底稿（可拖拽贴边）";
+      ball.style.cssText = `
+        position: fixed;
+        right: 12px;
+        bottom: 110px;
+        width: 38px;
+        height: 38px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #6366f1, #8b5cf6);
+        color: #fff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 18px;
+        box-shadow: 0 4px 12px rgba(99,102,241,0.4);
+        cursor: grab;
+        user-select: none;
+        touch-action: none;
+        z-index: 9999;
+        transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s, opacity 0.25s;
+      `;
+      ball.innerHTML = "🧠";
+
+      let isDragging = false;
+      let startX = 0, startY = 0;
+      let initX = 0, initY = 0;
+      let hasMoved = false;
+
+      const onPointerDown = (e) => {
+        isDragging = true;
+        hasMoved = false;
+        ball.style.cursor = "grabbing";
+        ball.style.transition = "none";
+        ball.style.transform = "scale(1.12)";
+        startX = e.clientX || (e.touches && e.touches[0].clientX);
+        startY = e.clientY || (e.touches && e.touches[0].clientY);
+        const rect = ball.getBoundingClientRect();
+        initX = rect.left;
+        initY = rect.top;
+        e.stopPropagation();
+      };
+
+      const onPointerMove = (e) => {
+        if (!isDragging) return;
+        const curX = e.clientX || (e.touches && e.touches[0].clientX);
+        const curY = e.clientY || (e.touches && e.touches[0].clientY);
+        const dx = curX - startX;
+        const dy = curY - startY;
+        if (Math.abs(dx) > 3 || Math.abs(dy) > 3) hasMoved = true;
+        ball.style.left = `${Math.max(8, Math.min(window.innerWidth - 46, initX + dx))}px`;
+        ball.style.top = `${Math.max(60, Math.min(window.innerHeight - 80, initY + dy))}px`;
+        ball.style.right = "auto";
+        ball.style.bottom = "auto";
+      };
+
+      const onPointerUp = () => {
+        if (!isDragging) return;
+        isDragging = false;
+        ball.style.cursor = "grab";
+        ball.style.transform = "scale(1)";
+        ball.style.transition = "left 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), transform 0.2s";
+        
+        const rect = ball.getBoundingClientRect();
+        const midX = window.innerWidth / 2;
+        if (rect.left + rect.width / 2 < midX) {
+          ball.style.left = "10px"; // 自动贴左边
+        } else {
+          ball.style.left = `${window.innerWidth - 48}px`; // 自动贴右边
+        }
+      };
+
+      ball.addEventListener("pointerdown", onPointerDown);
+      window.addEventListener("pointermove", onPointerMove);
+      window.addEventListener("pointerup", onPointerUp);
+
+      ball.onclick = (e) => {
+        if (!hasMoved) {
+          openCenterModal(props?.sessionId);
+        }
+      };
+
+      el.appendChild(ball);
+      return () => {
+        window.removeEventListener("pointermove", onPointerMove);
+        window.removeEventListener("pointerup", onPointerUp);
+        ball.remove();
+      };
     });
 
     ctx.ui.slot("chat.inputToolbar", (el, props) => {
