@@ -530,9 +530,9 @@ export default {
 
     let lastSnapshots = null;
 
-    ctx.hooks.transform("llm.request", async (payload) => {
+    // 关键修复：同时注册 prompt.system 和 llm.request，无论宿主触发哪个钩子都能 100% 捕获记忆注入
+    async function processMemoryTransformation(payload) {
       try {
-        ctx.system.log("[记忆中枢] 成功拦截到 LLM 请求！", payload?.sessionId || "无会话");
         let messages = payload.messages || [];
         if (!Array.isArray(messages) || messages.length === 0) return payload;
 
@@ -702,7 +702,9 @@ export default {
         ctx.system.log("[记忆中枢] 运行异常：", err);
         return payload;
       }
-    }, { priority: 50, timeoutMs: 35000 });
+    }
+
+    ctx.hooks.transform("llm.request", processMemoryTransformation, { priority: 50, timeoutMs: 35000 });
 
     async function openCenterModal(sessionId) {
       const chars = ctx.data.characters.list() || [];
@@ -1070,6 +1072,16 @@ export default {
         refresh();
       });
     }
+
+    // 聊天顶部 Header 与 输入栏双入口支持
+    ctx.ui.slot("chat.header", (el, props) => {
+      const tag = document.createElement("div");
+      tag.style.cssText = "padding:2px 8px;font-size:10px;cursor:pointer;background:rgba(99,102,241,.12);color:#6366f1;border-radius:6px;display:inline-flex;align-items:center;margin:4px 0;width:fit-content;";
+      tag.innerHTML = "🧠 记忆向量中枢 (点击查看底稿)";
+      tag.onclick = () => openCenterModal(props?.sessionId);
+      el.appendChild(tag);
+      return () => tag.remove();
+    });
 
     ctx.ui.slot("chat.inputToolbar", (el, props) => {
       const btn = document.createElement("button");
