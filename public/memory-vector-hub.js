@@ -962,7 +962,7 @@ export default {
               } catch (err) {
                 testLog.style.color = "#dc2626";
                 testLog.textContent = `✗ 向量测试失败: ${err.message}`;
-              } special finally { testEmbedBtn.disabled = false; }
+              } finally { testEmbedBtn.disabled = false; }
             };
 
             const testRerankBtn = el.querySelector("#mvhTestRerankBtn");
