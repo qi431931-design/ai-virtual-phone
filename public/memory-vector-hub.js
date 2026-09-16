@@ -594,15 +594,16 @@ export default {
           }
         }
 
-        // 获取当前角色 ID：支持 payload.characterId 或从上下文推断
+        // 严格定位角色：必须来自真实的聊天会话（有 sessionId 且关联角色，或者明确指定了 characterId）
         let targetCharId = payload.characterId || "";
         if (!targetCharId && payload.sessionId) {
           const sess = ctx.data.sessions.get(payload.sessionId);
-          targetCharId = sess?.contactId || "";
+          targetCharId = sess?.contactId || (sess?.characterIds && sess.characterIds[0]) || "";
         }
+
+        // 如果既没有会话也没有角色 ID（比如工坊自身对话、系统内置工具等非角色会话），绝对不触发记忆检索，原样放行！
         if (!targetCharId) {
-          const chars = ctx.data.characters.list() || [];
-          targetCharId = chars[0]?.id || "";
+          return payload;
         }
 
         {
