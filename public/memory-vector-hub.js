@@ -535,12 +535,8 @@ export default {
         let messages = payload.messages || [];
         if (!Array.isArray(messages) || messages.length === 0) return payload;
 
-        // 识别是否是角色对话请求（含有 memoryCore / memoryLongTerm / shortTermMemory 标签，或者 purpose 为 chat）
-        const hasMemoryTags = messages.some((m) => typeof m?.content === "string" && (m.content.includes("<" + TAG_LONG + ">") || m.content.includes(TAG_SHORT_OPEN)));
-        const isChatPurpose = payload.purpose === "chat" || !payload.purpose;
-
-        // 排除小卷、生图、翻译等非角色对话请求
-        if (!hasMemoryTags && !isChatPurpose) {
+        // 排除明确属于后台任务/翻译/小卷的请求；无 purpose 或 purpose 为 chat 正常处理
+        if (payload.purpose && payload.purpose !== "chat" && payload.purpose !== "generate") {
           return payload;
         }
 
@@ -556,8 +552,7 @@ export default {
         }
 
         const rawQuery = (prevAssistantPrompt ? (prevAssistantPrompt + " ") : "") + currentPrompt;
-        const query = sanitizeForEmbedding(rawQuery);
-        if (!query) return payload;
+        const query = sanitizeForEmbedding(rawQuery) || currentPrompt || "聊天";
 
         const allConfigs = await loadSystemApiConfigs();
         const embedConfigId = ctx.system.storage.get("chosenEmbedConfigId");
@@ -608,8 +603,15 @@ export default {
           const kwGuaranteeMax = num("keywordGuaranteeMax", 1);
           const rerankMinScore = Number(ctx.system.settings.get("rerankMinScore") ?? 0.50);
 
+          // 获取当前角色 ID：支持 payload.characterId 或从上下文推断
+          let targetCharId = payload.characterId || "";
+          if (!targetCharId && payload.sessionId) {
+            const sess = ctx.data.sessions.get(payload.sessionId);
+            targetCharId = sess?.contactId || "";
+          }
+
           const { picked, diag } = await retrieveLongMemories(
-            payload.characterId || "", query, qVec, topK, minSim, kwBoost, rerankConfig, kwGuaranteeMax, rerankMinScore
+            targetCharId, query, qVec, topK, minSim, kwBoost, rerankConfig, kwGuaranteeMax, rerankMinScore
           );
           longDiag = diag;
 
@@ -640,7 +642,7 @@ export default {
         }
 
         if (shortStartIdx >= 0 && shortEndIdx >= shortStartIdx) {
-          watermarkTime = await getLastSummaryTimestamp(payload.characterId || "");
+          watermarkTime = await getLastSummaryTimestamp(targetCharId);
           const allInner = [];
           for (let i = shortStartIdx + 1; i < shortEndIdx; i++) {
             allInner.push({ msgIdx: i, msg: messages[i] });
