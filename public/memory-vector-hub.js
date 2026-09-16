@@ -30,7 +30,7 @@ export default {
     id: "memory-vector-hub",
     name: "记忆向量与重排中枢",
     apiVersion: 1,
-    version: "12.4.0",
+    version: "12.5.0",
     author: "小坊",
     description: "句子级检索 + 向量余弦相似度 + 关键词保送 + 性能与防爆优化。",
     permissions: ["chat.read", "ui", "storage", "network"],
@@ -595,14 +595,21 @@ export default {
           }
         }
 
-        // 严格定位角色：必须来自真实的聊天会话（有 sessionId 且关联角色，或者明确指定了 characterId）
+        // 严格定位角色
         let targetCharId = payload.characterId || "";
         if (!targetCharId && payload.sessionId) {
           const sess = ctx.data.sessions.get(payload.sessionId);
           targetCharId = sess?.contactId || (sess?.characterIds && sess.characterIds[0]) || "";
         }
+        if (!targetCharId) {
+          // 兜底：如果会话里有包含长期记忆标签，取当前正在聊天的第一个角色
+          const hasLongTag = messages.some((m) => typeof m?.content === "string" && m.content.includes("<" + TAG_LONG + ">"));
+          if (hasLongTag) {
+            const chars = ctx.data.characters.list() || [];
+            targetCharId = chars[0]?.id || "";
+          }
+        }
 
-        // 如果既没有会话也没有角色 ID（比如工坊自身对话、系统内置工具等非角色会话），绝对不触发记忆检索，原样放行！
         if (!targetCharId) {
           return payload;
         }
@@ -698,6 +705,9 @@ export default {
           longDiag, at: new Date().toLocaleTimeString(),
         };
         ctx.system.storage.set("last_mvh_snapshot", JSON.stringify(lastSnapshots));
+        if (targetCharId) {
+          ctx.system.storage.set("last_mvh_snapshot_" + targetCharId, JSON.stringify(lastSnapshots));
+        }
 
         return payload;
       } catch (err) {
@@ -755,12 +765,12 @@ export default {
         async function refresh() {
           body.innerHTML = '<div style="color:#64748b;padding:16px 0;text-align:center;">正在读取本地记忆状态...</div>';
           try {
-            if (!lastSnapshots) {
-              try {
-                const storedSnap = ctx.system.storage.get("last_mvh_snapshot");
-                if (storedSnap) lastSnapshots = JSON.parse(storedSnap);
-              } catch (e) {}
-            }
+            // 每次打开优先读取持久化快照，保证不丢
+            try {
+              const storedSnap = ctx.system.storage.get("last_mvh_snapshot_" + currentCharId) || ctx.system.storage.get("last_mvh_snapshot");
+              if (storedSnap) lastSnapshots = JSON.parse(storedSnap);
+            } catch (e) {}
+
             const longMemories = await readLongMemories(currentCharId);
             const withVec = longMemories.filter((r) => Array.isArray(r.embedding) && r.embedding.length > 0);
             const missing = longMemories.filter((r) => !Array.isArray(r.embedding) || r.embedding.length === 0);
