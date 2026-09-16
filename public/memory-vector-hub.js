@@ -535,10 +535,7 @@ export default {
         let messages = payload.messages || [];
         if (!Array.isArray(messages) || messages.length === 0) return payload;
 
-        // 排除明确属于后台任务/翻译/小卷的请求；无 purpose 或 purpose 为 chat 正常处理
-        if (payload.purpose && payload.purpose !== "chat" && payload.purpose !== "generate") {
-          return payload;
-        }
+        // 无论何种 purpose，只要进到 LLM 请求就进行底稿解析与快照记录（仅过滤空请求）
 
         let currentPrompt = "";
         let prevAssistantPrompt = "";
@@ -596,6 +593,17 @@ export default {
           }
         }
 
+        // 获取当前角色 ID：支持 payload.characterId 或从上下文推断
+        let targetCharId = payload.characterId || "";
+        if (!targetCharId && payload.sessionId) {
+          const sess = ctx.data.sessions.get(payload.sessionId);
+          targetCharId = sess?.contactId || "";
+        }
+        if (!targetCharId) {
+          const chars = ctx.data.characters.list() || [];
+          targetCharId = chars[0]?.id || "";
+        }
+
         {
           const topK = num("longTermTopK", 4);
           const minSim = Number(ctx.system.settings.get("minSimilarity") ?? 0.25);
@@ -603,17 +611,15 @@ export default {
           const kwGuaranteeMax = num("keywordGuaranteeMax", 1);
           const rerankMinScore = Number(ctx.system.settings.get("rerankMinScore") ?? 0.50);
 
-          // 获取当前角色 ID：支持 payload.characterId 或从上下文推断
-          let targetCharId = payload.characterId || "";
-          if (!targetCharId && payload.sessionId) {
-            const sess = ctx.data.sessions.get(payload.sessionId);
-            targetCharId = sess?.contactId || "";
-          }
-
           const { picked, diag } = await retrieveLongMemories(
             targetCharId, query, qVec, topK, minSim, kwBoost, rerankConfig, kwGuaranteeMax, rerankMinScore
           );
           longDiag = diag;
+          finalLongList = picked.map((p) => ({
+            text: p.memText, hitSentence: p.sentText, hitQuery: p.kwQuery,
+            score: p.final, vec: p.vec, kw: p.kw, rerank: p.rerank,
+            source: p.source, kwHitCount: p.kwHitCount,
+          }));
 
           for (let i = 0; i < messages.length; i++) {
             if (typeof messages[i]?.content !== "string") continue;
@@ -624,11 +630,6 @@ export default {
               ? ("<" + TAG_LONG + ">\n" + picked.map((p) => p.memText).join("\n") + "\n</" + TAG_LONG + ">")
               : "";
             messages[i].content = rawLong.replace(reLong, () => newBlock);
-            finalLongList = picked.map((p) => ({
-              text: p.memText, hitSentence: p.sentText, hitQuery: p.kwQuery,
-              score: p.final, vec: p.vec, kw: p.kw, rerank: p.rerank,
-              source: p.source, kwHitCount: p.kwHitCount,
-            }));
             break;
           }
         }
@@ -693,6 +694,7 @@ export default {
           shortTurns: finalShortTurns, shortSupplemented, watermark: watermarkTime,
           longDiag, at: new Date().toLocaleTimeString(),
         };
+        ctx.system.storage.set("last_mvh_snapshot", JSON.stringify(lastSnapshots));
 
         return payload;
       } catch (err) {
@@ -748,6 +750,12 @@ export default {
         async function refresh() {
           body.innerHTML = '<div style="color:#64748b;padding:16px 0;text-align:center;">正在读取本地记忆状态...</div>';
           try {
+            if (!lastSnapshots) {
+              try {
+                const storedSnap = ctx.system.storage.get("last_mvh_snapshot");
+                if (storedSnap) lastSnapshots = JSON.parse(storedSnap);
+              } catch (e) {}
+            }
             const longMemories = await readLongMemories(currentCharId);
             const withVec = longMemories.filter((r) => Array.isArray(r.embedding) && r.embedding.length > 0);
             const missing = longMemories.filter((r) => !Array.isArray(r.embedding) || r.embedding.length === 0);
