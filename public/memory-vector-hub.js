@@ -532,12 +532,17 @@ export default {
 
     ctx.hooks.transform("llm.request", async (payload) => {
       try {
-        // 核心隔离：只拦截常规角色聊天（单聊/群聊），非角色请求（如小卷/小坊/生图/翻译等后台 purpose）或者没有 characterId 的直接放行
-        if (!payload.characterId || (payload.purpose && payload.purpose !== "chat")) {
+        let messages = payload.messages || [];
+        if (!Array.isArray(messages) || messages.length === 0) return payload;
+
+        // 识别是否是角色对话请求（含有 memoryCore / memoryLongTerm / shortTermMemory 标签，或者 purpose 为 chat）
+        const hasMemoryTags = messages.some((m) => typeof m?.content === "string" && (m.content.includes("<" + TAG_LONG + ">") || m.content.includes(TAG_SHORT_OPEN)));
+        const isChatPurpose = payload.purpose === "chat" || !payload.purpose;
+
+        // 排除小卷、生图、翻译等非角色对话请求
+        if (!hasMemoryTags && !isChatPurpose) {
           return payload;
         }
-
-        let messages = payload.messages || [];
 
         let currentPrompt = "";
         let prevAssistantPrompt = "";
