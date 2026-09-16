@@ -578,7 +578,7 @@ export default {
               cache[qKey] = qVec;
               saveCache(cache);
             } catch (e) {
-              ctx.system.log("[记忆中枢] Query 向量计算跳过（已自动降级）：", e?.message || e);
+              ctx.system.log("[记忆中枢] Query 向量计算跳过（已自动降级）：", (e && e.message) || String(e));
             }
           }
         }
