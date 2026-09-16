@@ -1076,29 +1076,36 @@ export default {
 
     // 聊天窗口内悬浮可拖拽、自动贴边精致小圆球
     ctx.ui.slot("chat.header", (el, props) => {
+      // 避免重复挂载
+      const existing = document.getElementById("mvh-floating-ball");
+      if (existing) existing.remove();
+
       const ball = document.createElement("div");
+      ball.id = "mvh-floating-ball";
       ball.title = "点击查看记忆底稿（可拖拽贴边）";
       ball.style.cssText = `
-        position: fixed;
-        right: 12px;
-        bottom: 110px;
-        width: 38px;
-        height: 38px;
-        border-radius: 50%;
-        background: linear-gradient(135deg, #6366f1, #8b5cf6);
-        color: #fff;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 18px;
-        box-shadow: 0 4px 12px rgba(99,102,241,0.4);
-        cursor: grab;
-        user-select: none;
-        touch-action: none;
-        z-index: 9999;
+        position: fixed !important;
+        right: 12px !important;
+        bottom: 120px !important;
+        width: 42px !important;
+        height: 42px !important;
+        border-radius: 50% !important;
+        background: linear-gradient(135deg, #6366f1, #8b5cf6) !important;
+        color: #fff !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        font-size: 20px !important;
+        box-shadow: 0 6px 16px rgba(99,102,241,0.45) !important;
+        cursor: grab !important;
+        user-select: none !important;
+        touch-action: none !important;
+        z-index: 99999 !important;
+        pointer-events: auto !important;
         transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s, opacity 0.25s;
       `;
       ball.innerHTML = "🧠";
+      document.body.appendChild(ball);
 
       let isDragging = false;
       let startX = 0, startY = 0;
@@ -1158,7 +1165,6 @@ export default {
         }
       };
 
-      el.appendChild(ball);
       return () => {
         window.removeEventListener("pointermove", onPointerMove);
         window.removeEventListener("pointerup", onPointerUp);
