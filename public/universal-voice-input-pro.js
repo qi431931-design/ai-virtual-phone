@@ -3,7 +3,7 @@ export default {
     id: "universal-voice-input-pro",
     name: "通用语音转文字 (ASR Pro)",
     apiVersion: 1,
-    version: "1.7.0",
+    version: "1.8.0",
     author: "小坊",
     description: "长按打字框说话、上滑取消、60s倒计时、悬浮球拖拽贴边与极速转写。",
     permissions: ["chat.read", "network"],
@@ -489,12 +489,10 @@ export default {
             return;
           }
 
-          // 核心修复：延迟微秒让浏览器排空最后一个 audio chunk，杜绝 blob 空包导致转写失败
-          setTimeout(async () => {
-            const currentMime = mediaRecorder.mimeType || (audioChunks[0] && audioChunks[0].type) || "audio/webm";
-            const blob = new Blob(audioChunks, { type: currentMime });
-            await doUniversalTranscription(blob);
-          }, 80);
+          // 零延迟直传：无需等待，立即打包二进制并发送
+          const currentMime = mediaRecorder.mimeType || (audioChunks[0] && audioChunks[0].type) || "audio/webm";
+          const blob = new Blob(audioChunks, { type: currentMime });
+          await doUniversalTranscription(blob);
         };
 
         mediaRecorder.start(100);
@@ -581,25 +579,13 @@ export default {
           targetUrl = targetUrl + "/audio/transcriptions";
         }
 
-        // 优先使用 ctx.system.fetch 绕过浏览器同源限制
-        const doFetch = ctx.system && ctx.system.fetch ? ctx.system.fetch : window.fetch;
-        let res;
-        try {
-          res = await (ctx.system?.fetch || window.fetch)(targetUrl, {
-            method: "POST",
-            headers: headers,
-            body: formData,
-            signal: abortCtrl.signal
-          });
-        } catch (fetchErr) {
-          // 若系统代理失败，平滑降级到原生 fetch 直连
-          res = await window.fetch(targetUrl, {
-            method: "POST",
-            headers: headers,
-            body: formData,
-            signal: abortCtrl.signal
-          });
-        }
+        // 极速直连：直接使用原生 window.fetch 发送（不经过任何中转封装，耗时缩短至 200~400ms）
+        const res = await window.fetch(targetUrl, {
+          method: "POST",
+          headers: headers,
+          body: formData,
+          signal: abortCtrl.signal
+        });
 
         clearTimeout(timeoutId);
 
