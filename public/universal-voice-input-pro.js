@@ -3,7 +3,7 @@ export default {
     id: "universal-voice-input-pro",
     name: "通用语音转文字 (ASR Pro)",
     apiVersion: 1,
-    version: "1.8.0",
+    version: "1.9.0",
     author: "小坊",
     description: "长按打字框说话、上滑取消、60s倒计时、悬浮球拖拽贴边与极速转写。",
     permissions: ["chat.read", "network"],
@@ -552,14 +552,17 @@ export default {
       }, 35000);
 
       try {
-        const formData = new FormData();
+        // 确保 Blob 有明确的 MIME 类型，避免 SiliconFlow 后端解析为 application/octet-stream 报错
+        let mime = blob.type || "audio/webm";
         let ext = "webm";
-        if (blob.type.indexOf("mp4") !== -1) ext = "m4a";
-        else if (blob.type.indexOf("ogg") !== -1) ext = "ogg";
-        else if (blob.type.indexOf("aac") !== -1) ext = "aac";
-        else if (blob.type.indexOf("wav") !== -1) ext = "wav";
+        if (mime.indexOf("mp4") !== -1 || mime.indexOf("m4a") !== -1) { ext = "m4a"; mime = "audio/mp4"; }
+        else if (mime.indexOf("ogg") !== -1) { ext = "ogg"; mime = "audio/ogg"; }
+        else if (mime.indexOf("wav") !== -1) { ext = "wav"; mime = "audio/wav"; }
 
-        const audioFile = new File([blob], "speech." + ext, { type: blob.type || "audio/webm" });
+        const typedBlob = new Blob([blob], { type: mime });
+        const audioFile = new File([typedBlob], "speech." + ext, { type: mime });
+
+        const formData = new FormData();
         formData.append("file", audioFile);
         formData.append("model", model);
 
@@ -589,12 +592,17 @@ export default {
 
         clearTimeout(timeoutId);
 
+        const resText = await res.text();
         if (!res.ok) {
-          const detail = await res.text();
-          throw new Error("[HTTP " + res.status + "] " + detail);
+          throw new Error("[HTTP " + res.status + "] " + resText.slice(0, 100));
         }
 
-        const data = await res.json();
+        let data;
+        try {
+          data = JSON.parse(resText);
+        } catch (e) {
+          data = { text: resText };
+        }
         let text = (data.text || data.result || (typeof data === "string" ? data : "")).trim();
 
         if (cleanSense) {
