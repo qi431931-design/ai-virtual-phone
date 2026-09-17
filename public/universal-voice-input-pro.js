@@ -3,10 +3,10 @@ export default {
     id: "universal-voice-input-pro",
     name: "通用语音转文字 (ASR Pro)",
     apiVersion: 1,
-    version: "1.6.1",
+    version: "1.6.2",
     author: "小坊",
     description: "长按打字框说话、上滑取消、60s倒计时、悬浮球拖拽贴边与极速转写。",
-    permissions: ["chat.read"],
+    permissions: ["chat.read", "network"],
     settings: [
       {
         key: "presetProvider",
@@ -583,12 +583,23 @@ export default {
 
         // 优先使用 ctx.system.fetch 绕过浏览器同源限制
         const doFetch = ctx.system && ctx.system.fetch ? ctx.system.fetch : window.fetch;
-        const res = await doFetch(targetUrl, {
-          method: "POST",
-          headers: headers,
-          body: formData,
-          signal: abortCtrl.signal
-        });
+        let res;
+        try {
+          res = await (ctx.system?.fetch || window.fetch)(targetUrl, {
+            method: "POST",
+            headers: headers,
+            body: formData,
+            signal: abortCtrl.signal
+          });
+        } catch (fetchErr) {
+          // 若系统代理失败，平滑降级到原生 fetch 直连
+          res = await window.fetch(targetUrl, {
+            method: "POST",
+            headers: headers,
+            body: formData,
+            signal: abortCtrl.signal
+          });
+        }
 
         clearTimeout(timeoutId);
 
