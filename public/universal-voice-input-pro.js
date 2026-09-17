@@ -3,7 +3,7 @@ export default {
     id: "universal-voice-input-pro",
     name: "通用语音转文字 (ASR Pro)",
     apiVersion: 1,
-    version: "1.5.5",
+    version: "1.6.0",
     author: "小坊",
     description: "长按打字框说话、上滑取消、60s倒计时、悬浮球拖拽贴边与极速转写。",
     permissions: ["chat.read"],
@@ -205,7 +205,7 @@ export default {
       fabWrap.style.top = nextY + "px";
     };
 
-    const onFabPointerUp = function () {
+    const onFabPointerUp = function (e) {
       if (!isDraggingFab) return;
       isDraggingFab = false;
       document.removeEventListener("pointermove", onFabPointerMove);
@@ -219,6 +219,7 @@ export default {
       fabWrap.style.left = targetX + "px";
 
       if (!hasMoved) {
+        // 悬浮球模式支持【长按说话，松手即完成】与【单击启停】
         if (!isRecording) {
           startRecording("float");
         } else {
@@ -437,10 +438,24 @@ export default {
       capsuleEl.classList.remove("cancel-mode", "warn-mode");
 
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        // 针对转写提速：限制音频采样率为 16kHz 单声道（Whisper/SenseVoice 最佳输入，体积缩小 4 倍，上传极快！）
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            channelCount: 1,
+            sampleRate: 16000,
+            noiseSuppression: true,
+            echoCancellation: true
+          }
+        });
         audioChunks = [];
 
-        const mimeTypes = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/aac", "audio/ogg"];
+        const mimeTypes = [
+          "audio/webm;codecs=opus",
+          "audio/ogg;codecs=opus",
+          "audio/mp4",
+          "audio/aac",
+          "audio/webm"
+        ];
         let selectedMime = "";
         for (let i = 0; i < mimeTypes.length; i++) {
           if (MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(mimeTypes[i])) {
@@ -448,7 +463,9 @@ export default {
             break;
           }
         }
-        mediaRecorder = selectedMime ? new MediaRecorder(stream, { mimeType: selectedMime }) : new MediaRecorder(stream);
+        mediaRecorder = selectedMime
+          ? new MediaRecorder(stream, { mimeType: selectedMime, audioBitsPerSecond: 24000 })
+          : new MediaRecorder(stream);
 
         mediaRecorder.ondataavailable = function (e) {
           if (e.data && e.data.size > 0) audioChunks.push(e.data);
@@ -524,11 +541,12 @@ export default {
         return;
       }
 
-      const toast = ctx.ui.toast("正在转写…", { durationMs: 0 });
+      const toast = ctx.ui.toast("正在极速转写…", { durationMs: 0 });
       const abortCtrl = new AbortController();
+      // 上调超时为 35s，防止长语音或弱网时误触发超时截断
       const timeoutId = setTimeout(function () {
         abortCtrl.abort();
-      }, 15000);
+      }, 35000);
 
       try {
         const formData = new FormData();
