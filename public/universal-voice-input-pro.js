@@ -3,7 +3,7 @@ export default {
     id: "universal-voice-input-pro",
     name: "通用语音转文字 (ASR Pro)",
     apiVersion: 1,
-    version: "1.6.3",
+    version: "1.7.0",
     author: "小坊",
     description: "长按打字框说话、上滑取消、60s倒计时、悬浮球拖拽贴边与极速转写。",
     permissions: ["chat.read", "network"],
@@ -211,15 +211,10 @@ export default {
       document.removeEventListener("pointermove", onFabPointerMove);
       document.removeEventListener("pointerup", onFabPointerUp);
 
-      const curX = fabWrap.offsetLeft;
-      const mid = window.innerWidth / 2;
-      const targetX = curX < mid ? 12 : window.innerWidth - 56;
-
-      fabWrap.style.transition = "left 0.25s ease, top 0.25s ease";
-      fabWrap.style.left = targetX + "px";
+      // 去除自动贴边：支持随心所欲自由停留在屏幕任意位置
+      fabWrap.style.transition = "none";
 
       if (!hasMoved) {
-        // 悬浮球模式支持【长按说话，松手即完成】与【单击启停】
         if (!isRecording) {
           startRecording("float");
         } else {
@@ -489,15 +484,20 @@ export default {
           }
 
           const duration = Date.now() - recordStartTime;
-          if (duration < 400) {
+          if (duration < 300) {
             ctx.ui.toast("说话时间太短");
             return;
           }
-          const blob = new Blob(audioChunks, { type: mediaRecorder.mimeType || "audio/webm" });
-          await doUniversalTranscription(blob);
+
+          // 核心修复：延迟微秒让浏览器排空最后一个 audio chunk，杜绝 blob 空包导致转写失败
+          setTimeout(async () => {
+            const currentMime = mediaRecorder.mimeType || (audioChunks[0] && audioChunks[0].type) || "audio/webm";
+            const blob = new Blob(audioChunks, { type: currentMime });
+            await doUniversalTranscription(blob);
+          }, 80);
         };
 
-        mediaRecorder.start(200);
+        mediaRecorder.start(100);
         isRecording = true;
         recordStartTime = Date.now();
 
