@@ -30,7 +30,7 @@ export default {
     id: "memory-vector-hub",
     name: "记忆向量与重排中枢",
     apiVersion: 1,
-    version: "12.6.0",
+    version: "13.0.0",
     author: "小坊",
     description: "句子级检索 + 向量余弦相似度 + 关键词保送 + 性能与防爆优化。",
     permissions: ["chat.read", "ui", "storage", "network"],
@@ -839,6 +839,28 @@ export default {
                 <div id="mvhSearchLog" style="font-size:11px;margin-top:8px;color:#334155;white-space:pre-wrap;max-height:260px;overflow-y:auto;"></div>
               </div>
 
+              <div style="background:#fff;border:1px solid #cbd5e1;border-radius:12px;padding:14px;margin-bottom:14px;box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+                <div style="font-weight:700;font-size:14px;color:#334155;margin-bottom:8px;">📦 导出记忆库 (JSON 格式)</div>
+                <div style="font-size:11px;color:#64748b;margin-bottom:10px;">可自由勾选导出的记忆类别，导出的文件可直接备份或导入其他小手机设备。</div>
+                <div style="display:flex;gap:14px;margin-bottom:12px;font-size:12px;color:#334155;flex-wrap:wrap;">
+                  <label style="display:flex;align-items:center;gap:4px;cursor:pointer;">
+                    <input type="checkbox" id="mvhExpLong" checked /> 长期记忆 (${longMemories.length} 条)
+                  </label>
+                  <label style="display:flex;align-items:center;gap:4px;cursor:pointer;">
+                    <input type="checkbox" id="mvhExpCore" checked /> 核心记忆 (${lastSnapshots?.core?.length || 0} 条)
+                  </label>
+                  <label style="display:flex;align-items:center;gap:4px;cursor:pointer;">
+                    <input type="checkbox" id="mvhExpShort" /> 短期记忆增量 (${lastSnapshots?.short?.length || 0} 组)
+                  </label>
+                  <label style="display:flex;align-items:center;gap:4px;cursor:pointer;">
+                    <input type="checkbox" id="mvhExpVec" checked /> 包含向量数据 (Embedding)
+                  </label>
+                </div>
+                <button id="mvhExportBtn" style="width:100%;padding:8px;border-radius:8px;border:none;background:#059669;color:#fff;font-weight:700;font-size:12px;cursor:pointer;">
+                  📥 导出选中记忆文件 (.json)
+                </button>
+              </div>
+
               <div style="background:#fff;border:1px solid #cbd5e1;border-radius:12px;padding:14px;box-shadow:0 1px 3px rgba(0,0,0,0.05);">
                 <div style="font-weight:700;font-size:14px;color:#334155;margin-bottom:8px;">🔌 模型配置与向量补齐</div>
                 <div style="margin-bottom:10px;">
@@ -1016,6 +1038,73 @@ export default {
                 testLog.style.color = "#dc2626";
                 testLog.textContent = `✗ Rerank 测试失败: ${err.message}`;
               } finally { testRerankBtn.disabled = false; }
+            };
+
+            // 导出记忆文件逻辑
+            const expBtn = el.querySelector("#mvhExportBtn");
+            if (expBtn) expBtn.onclick = () => {
+              const expLong = el.querySelector("#mvhExpLong").checked;
+              const expCore = el.querySelector("#mvhExpCore").checked;
+              const expShort = el.querySelector("#mvhExpShort").checked;
+              const expVec = el.querySelector("#mvhExpVec").checked;
+
+              if (!expLong && !expCore && !expShort) {
+                ctx.ui.toast("请至少勾选一种记忆类别！");
+                return;
+              }
+
+              const exportData = {
+                format: "ai-phone-memory-export",
+                version: "1.0",
+                characterId: currentCharId,
+                exportedAt: new Date().toISOString(),
+                stats: {},
+              };
+
+              if (expLong) {
+                exportData.longTerm = longMemories.map((m) => {
+                  const item = {
+                    id: m.id,
+                    content: m.content,
+                    createdAt: m.createdAt,
+                    importance: m.importance,
+                    reason: m.reason,
+                  };
+                  if (expVec && Array.isArray(m.embedding)) {
+                    item.embedding = m.embedding;
+                  }
+                  return item;
+                });
+                exportData.stats.longTermCount = exportData.longTerm.length;
+              }
+
+              if (expCore) {
+                exportData.core = (lastSnapshots?.core || []).map((text, i) => ({
+                  id: "core_" + (i + 1),
+                  content: text,
+                }));
+                exportData.stats.coreCount = exportData.core.length;
+              }
+
+              if (expShort) {
+                exportData.shortTerm = (lastSnapshots?.short || []).map((text, i) => ({
+                  id: "short_" + (i + 1),
+                  content: text,
+                }));
+                exportData.stats.shortTermCount = exportData.shortTerm.length;
+              }
+
+              const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement("a");
+              a.href = url;
+              const charName = chars.find((c) => c.id === currentCharId)?.name || currentCharId || "角色";
+              a.download = `${charName}_记忆导出_${new Date().toISOString().slice(0, 10)}.json`;
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+              URL.revokeObjectURL(url);
+              ctx.ui.toast("记忆文件导出成功！");
             };
 
             const fillBtn = el.querySelector("#mvhFillBtn");
