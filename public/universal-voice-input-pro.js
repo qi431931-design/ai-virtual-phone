@@ -3,7 +3,7 @@ export default {
     id: "universal-voice-input-pro",
     name: "通用语音转文字 (ASR Pro)",
     apiVersion: 1,
-    version: "1.6.2",
+    version: "1.6.3",
     author: "小坊",
     description: "长按打字框说话、上滑取消、60s倒计时、悬浮球拖拽贴边与极速转写。",
     permissions: ["chat.read", "network"],
@@ -628,8 +628,14 @@ export default {
           });
           ctx.ui.toast("已发送");
         } else {
-          const target = activeInputEl || document.querySelector(".chat-input-textarea, textarea");
-          if (target) {
+          // 多选择器深度定位聊天输入框
+        const allTextareas = Array.from(document.querySelectorAll("textarea, input[type='text'], [contenteditable='true']"));
+        const target = activeInputEl || allTextareas.find(el => el.closest && el.closest(".chat-room-wrapper, .chat-input-bar, .page-container, footer, form")) || document.querySelector(".chat-input-textarea") || allTextareas[0];
+
+        if (target) {
+          if (target.isContentEditable) {
+            target.textContent = (target.textContent ? target.textContent + " " : "") + text;
+          } else {
             const oldVal = target.value || "";
             const nextVal = oldVal ? (oldVal + " " + text) : text;
 
@@ -642,24 +648,30 @@ export default {
             } else {
               target.value = nextVal;
             }
-
-            target.dispatchEvent(new Event("input", { bubbles: true }));
-            target.dispatchEvent(new Event("change", { bubbles: true }));
-            target.focus();
-
-            if (typeof target.setSelectionRange === "function") {
-              const len = target.value.length;
-              target.setSelectionRange(len, len);
-            }
-
-            target.style.height = "auto";
-            target.style.height = Math.min(target.scrollHeight, 120) + "px";
-
-            ctx.ui.toast("已填入输入框");
-          } else {
-            await navigator.clipboard.writeText(text);
-            ctx.ui.toast("已转写：" + text);
           }
+
+          target.dispatchEvent(new Event("input", { bubbles: true }));
+          target.dispatchEvent(new Event("change", { bubbles: true }));
+          target.focus();
+
+          if (typeof target.setSelectionRange === "function") {
+            const len = (target.value || "").length;
+            target.setSelectionRange(len, len);
+          }
+
+          try {
+            await navigator.clipboard.writeText(text);
+          } catch (e) {}
+
+          ctx.ui.toast("✓ 转写成功：" + text.slice(0, 15) + (text.length > 15 ? "..." : ""));
+        } else {
+          try {
+            await navigator.clipboard.writeText(text);
+            ctx.ui.toast("已复制到剪贴板：" + text);
+          } catch (e) {
+            ctx.ui.toast("转写完成：" + text);
+          }
+        }
         }
       } catch (err) {
         clearTimeout(timeoutId);
