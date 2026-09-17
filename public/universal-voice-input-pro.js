@@ -3,7 +3,7 @@ export default {
     id: "universal-voice-input-pro",
     name: "通用语音转文字 (ASR Pro)",
     apiVersion: 1,
-    version: "1.6.0",
+    version: "1.6.1",
     author: "小坊",
     description: "长按打字框说话、上滑取消、60s倒计时、悬浮球拖拽贴边与极速转写。",
     permissions: ["chat.read"],
@@ -438,15 +438,20 @@ export default {
       capsuleEl.classList.remove("cancel-mode", "warn-mode");
 
       try {
-        // 针对转写提速：限制音频采样率为 16kHz 单声道（Whisper/SenseVoice 最佳输入，体积缩小 4 倍，上传极快！）
-        const stream = await navigator.mediaDevices.getUserMedia({
-          audio: {
-            channelCount: 1,
-            sampleRate: 16000,
-            noiseSuppression: true,
-            echoCancellation: true
-          }
-        });
+        // 兼容全平台：先尝试标准音轨约束，被拒绝则回退到纯 true，杜绝 OverconstrainedError
+        let stream = null;
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({
+            audio: {
+              channelCount: { ideal: 1 },
+              sampleRate: { ideal: 16000 },
+              noiseSuppression: true,
+              echoCancellation: true
+            }
+          });
+        } catch (mediaErr) {
+          stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        }
         audioChunks = [];
 
         const mimeTypes = [
@@ -576,7 +581,9 @@ export default {
           targetUrl = targetUrl + "/audio/transcriptions";
         }
 
-        const res = await (window.fetch || ctx.system.fetch)(targetUrl, {
+        // 优先使用 ctx.system.fetch 绕过浏览器同源限制
+        const doFetch = ctx.system && ctx.system.fetch ? ctx.system.fetch : window.fetch;
+        const res = await doFetch(targetUrl, {
           method: "POST",
           headers: headers,
           body: formData,
