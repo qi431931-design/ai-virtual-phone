@@ -3,7 +3,7 @@ export default {
     id: "universal-voice-input-pro",
     name: "通用语音转文字 (ASR Pro)",
     apiVersion: 1,
-    version: "1.5.4",
+    version: "1.5.5",
     author: "小坊",
     description: "长按打字框说话、上滑取消、60s倒计时、悬浮球拖拽贴边与极速转写。",
     permissions: ["chat.read"],
@@ -440,10 +440,10 @@ export default {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         audioChunks = [];
 
-        const mimeTypes = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4"];
+        const mimeTypes = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/aac", "audio/ogg"];
         let selectedMime = "";
         for (let i = 0; i < mimeTypes.length; i++) {
-          if (MediaRecorder.isTypeSupported(mimeTypes[i])) {
+          if (MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(mimeTypes[i])) {
             selectedMime = mimeTypes[i];
             break;
           }
@@ -532,8 +532,14 @@ export default {
 
       try {
         const formData = new FormData();
-        const ext = blob.type.indexOf("mp4") !== -1 ? "m4a" : "webm";
-        formData.append("file", new File([blob], "speech." + ext, { type: blob.type || "audio/webm" }));
+        let ext = "webm";
+        if (blob.type.indexOf("mp4") !== -1) ext = "m4a";
+        else if (blob.type.indexOf("ogg") !== -1) ext = "ogg";
+        else if (blob.type.indexOf("aac") !== -1) ext = "aac";
+        else if (blob.type.indexOf("wav") !== -1) ext = "wav";
+
+        const audioFile = new File([blob], "speech." + ext, { type: blob.type || "audio/webm" });
+        formData.append("file", audioFile);
         formData.append("model", model);
 
         const isSenseVoice = model.toLowerCase().indexOf("sensevoice") !== -1;
@@ -546,7 +552,13 @@ export default {
           headers["Authorization"] = "Bearer " + key;
         }
 
-        const res = await (window.fetch || ctx.system.fetch)(base + "/audio/transcriptions", {
+        // 兼容 /v1/audio/transcriptions 与 /audio/transcriptions
+        let targetUrl = base;
+        if (!targetUrl.endsWith("/audio/transcriptions")) {
+          targetUrl = targetUrl + "/audio/transcriptions";
+        }
+
+        const res = await (window.fetch || ctx.system.fetch)(targetUrl, {
           method: "POST",
           headers: headers,
           body: formData,
