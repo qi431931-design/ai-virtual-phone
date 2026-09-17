@@ -1,71 +1,35 @@
+// 通用语音转文字 · 硅基流动极速版 (v2.0.0)
 export default {
   manifest: {
     id: "universal-voice-input-pro",
-    name: "通用语音转文字 (ASR Pro)",
+    name: "硅基流动极速语音转写",
     apiVersion: 1,
-    version: "1.9.0",
+    version: "2.0.0",
     author: "小坊",
-    description: "长按打字框说话、上滑取消、60s倒计时、悬浮球拖拽贴边与极速转写。",
+    description: "专为 SiliconFlow SenseVoice 定制，长按打字框说话、上滑取消、自由悬浮球与毫秒级极速转写。",
     permissions: ["chat.read", "network"],
     settings: [
       {
-        key: "presetProvider",
-        label: "服务商预设",
-        type: "select",
-        default: "siliconflow",
-        options: [
-          { value: "siliconflow", label: "SiliconFlow 硅基流动 (国内推荐·免翻)" },
-          { value: "groq", label: "Groq Whisper (海外直连·极速)" },
-          { value: "openai", label: "OpenAI 官方 (whisper-1)" },
-          { value: "custom", label: "自定义 / 第三方中转站" }
-        ]
-      },
-      {
         key: "apiKey",
-        label: "API Key (密钥)",
+        label: "SiliconFlow API Key (密钥)",
         type: "text",
         default: ""
       },
       {
-        key: "apiBase",
-        label: "API Base URL",
-        type: "text",
-        default: "https://api.siliconflow.cn/v1"
-      },
-      {
         key: "modelName",
-        label: "ASR 语音模型",
+        label: "语音模型",
         type: "text",
         default: "FunAudioLLM/SenseVoiceSmall"
       },
       {
-        key: "language",
-        label: "识别语言 (SenseVoice 选 auto)",
-        type: "select",
-        default: "auto",
-        options: [
-          { value: "auto", label: "自动识别 (SenseVoice/Whisper 推荐)" },
-          { value: "zh", label: "中文" },
-          { value: "en", label: "英语" },
-          { value: "ja", label: "日语" },
-          { value: "yue", label: "粤语" }
-        ]
-      },
-      {
-        key: "cleanSenseVoiceTags",
-        label: "自动清洗 SenseVoice 标签",
+        key: "showFab",
+        label: "开启悬浮麦克风球",
         type: "boolean",
         default: true
       },
       {
-        key: "showFab",
-        label: "开启悬浮麦克风 (支持拖拽贴边)",
-        type: "boolean",
-        default: false
-      },
-      {
         key: "autoSend",
-        label: "转写后直接发送给角色",
+        label: "转写后直接发送消息",
         type: "boolean",
         default: false
       }
@@ -84,54 +48,12 @@ export default {
     let timerTickId = null;
 
     const MAX_RECORD_SEC = 60;
-
-    const PROVIDER_CONFIGS = {
-      siliconflow: {
-        base: "https://api.siliconflow.cn/v1",
-        model: "FunAudioLLM/SenseVoiceSmall"
-      },
-      groq: {
-        base: "https://api.groq.com/openai/v1",
-        model: "whisper-large-v3-turbo"
-      },
-      openai: {
-        base: "https://api.openai.com/v1",
-        model: "whisper-1"
-      }
-    };
+    const API_ENDPOINT = "https://api.siliconflow.cn/v1/audio/transcriptions";
 
     ctx.hooks.on("session.opened", function (p) {
       if (p && p.sessionId) {
         currentSessionId = p.sessionId;
         updateUI();
-      }
-    });
-
-    const applyProviderPreset = function (providerKey) {
-      const cfg = PROVIDER_CONFIGS[providerKey];
-      if (!cfg) return;
-      ctx.system.settings.set("presetProvider", providerKey);
-      ctx.system.settings.set("apiBase", cfg.base);
-      ctx.system.settings.set("modelName", cfg.model);
-
-      const allInputs = document.querySelectorAll("input[type='text'], input:not([type])");
-      for (let i = 0; i < allInputs.length; i++) {
-        const input = allInputs[i];
-        const row = input.closest("div, label, tr");
-        const rowText = row ? row.textContent : "";
-        if (rowText.indexOf("Base URL") !== -1 || rowText.indexOf("API Base") !== -1) {
-          input.value = cfg.base;
-          input.dispatchEvent(new Event("input", { bubbles: true }));
-        } else if (rowText.indexOf("语音模型") !== -1 || rowText.indexOf("模型名称") !== -1) {
-          input.value = cfg.model;
-          input.dispatchEvent(new Event("input", { bubbles: true }));
-        }
-      }
-    };
-
-    ctx.system.settings.onChange(function (key, val) {
-      if (key === "presetProvider") {
-        applyProviderPreset(val);
       }
     });
 
@@ -147,10 +69,10 @@ export default {
       ".xf-pro-wave span:nth-child(2) { animation-delay: 0.15s; height: 70%; } " +
       ".xf-pro-wave span:nth-child(3) { animation-delay: 0.3s; height: 100%; } " +
       "@keyframes xf-wave-anim { 0%, 100% { transform: scaleY(0.3); } 50% { transform: scaleY(1); } } " +
-      ".xf-pro-fab-wrap { position: fixed; width: 44px; height: 44px; display: none; z-index: 9999; user-select: none; touch-action: none; } " +
-      ".xf-pro-fab-mic { width: 100%; height: 100%; border-radius: 50%; background: rgba(30, 32, 38, 0.82); color: #e4e4e7; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 18px rgba(0, 0, 0, 0.38); cursor: grab; border: 1px solid rgba(255, 255, 255, 0.18); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); transition: transform 0.12s ease, background-color 0.2s ease; } " +
+      ".xf-pro-fab-wrap { position: fixed; width: 44px; height: 44px; display: none; z-index: 99999; user-select: none; touch-action: none; } " +
+      ".xf-pro-fab-mic { width: 100%; height: 100%; border-radius: 50%; background: rgba(30, 41, 59, 0.85); color: #e2e8f0; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25); cursor: grab; border: 1px solid rgba(255, 255, 255, 0.18); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); transition: transform 0.12s ease, background-color 0.2s ease; } " +
       ".xf-pro-fab-mic:active { cursor: grabbing; } " +
-      ".xf-pro-fab-mic.is-rec { background: rgba(220, 38, 38, 0.9) !important; border-color: rgba(239, 68, 68, 0.7) !important; color: #ffffff !important; }"
+      ".xf-pro-fab-mic.is-rec { background: rgba(220, 38, 38, 0.92) !important; border-color: rgba(239, 68, 68, 0.8) !important; color: #ffffff !important; }"
     );
 
     const capsuleEl = document.createElement("div");
@@ -165,7 +87,7 @@ export default {
     document.body.appendChild(fabWrap);
 
     fabWrap.style.left = (window.innerWidth - 56) + "px";
-    fabWrap.style.top = (window.innerHeight - 130) + "px";
+    fabWrap.style.top = (window.innerHeight - 140) + "px";
 
     let isDraggingFab = false;
     let dragStartPos = { x: 0, y: 0 };
@@ -205,13 +127,13 @@ export default {
       fabWrap.style.top = nextY + "px";
     };
 
-    const onFabPointerUp = function (e) {
+    const onFabPointerUp = function () {
       if (!isDraggingFab) return;
       isDraggingFab = false;
       document.removeEventListener("pointermove", onFabPointerMove);
       document.removeEventListener("pointerup", onFabPointerUp);
 
-      // 去除自动贴边：支持随心所欲自由停留在屏幕任意位置
+      // 自由停留，不强制贴边
       fabWrap.style.transition = "none";
 
       if (!hasMoved) {
@@ -226,8 +148,8 @@ export default {
     micBtn.addEventListener("pointerdown", onFabPointerDown);
 
     const updateUI = function () {
-      const showFab = ctx.system.settings.get("showFab") === true;
-      const chatTextarea = document.querySelector(".chat-input-textarea");
+      const showFab = ctx.system.settings.get("showFab") !== false;
+      const chatTextarea = document.querySelector("textarea, .chat-input-textarea");
       if (!showFab || !chatTextarea) {
         fabWrap.style.display = "none";
         return;
@@ -242,43 +164,33 @@ export default {
       return raw.replace(/^Bearer\s+/i, "").replace(/[\r\n\t\s"']/g, "").trim();
     };
 
-    const getBaseUrl = function () {
-      const b = (ctx.system.settings.get("apiBase") || "").trim();
-      if (!b) {
-        const p = ctx.system.settings.get("presetProvider") || "siliconflow";
-        return PROVIDER_CONFIGS[p] ? PROVIDER_CONFIGS[p].base : "https://api.siliconflow.cn/v1";
-      }
-      return b.replace(/\/+$/, "");
-    };
-
     ctx.ui.slot("settings.section", function (container) {
       container.style.cssText = "margin-top:14px;padding:14px;background:rgba(125,125,125,0.08);border-radius:12px;border:1px solid rgba(125,125,125,0.15);";
-      container.innerHTML = '<div style="font-size:13px;font-weight:600;margin-bottom:4px;">ASR 模型拉取与连通性诊断</div><div style="font-size:12px;opacity:0.75;margin-bottom:10px;">填入上方 Key 后点此测试，可自动校验并筛选可用语音模型：</div><button id="xf-diag-btn" style="width:100%;padding:9px;border-radius:6px;background:#2563eb;color:#fff;border:none;font-size:12px;font-weight:500;cursor:pointer;">拉取远程模型并测试连通性</button><div id="xf-diag-box" style="margin-top:10px;display:none;padding:10px;border-radius:8px;font-size:12px;white-space:pre-wrap;word-break:break-all;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);"></div>';
+      container.innerHTML = '<div style="font-size:13px;font-weight:600;margin-bottom:4px;">⚡ SiliconFlow API 连通性测试</div><div style="font-size:12px;opacity:0.75;margin-bottom:10px;">填入上方 Key 后点击测试，自动校验并拉取硅基流动语音模型：</div><button id="xf-diag-btn" style="width:100%;padding:9px;border-radius:6px;background:#2563eb;color:#fff;border:none;font-size:12px;font-weight:600;cursor:pointer;">测试连接并验证 Key</button><div id="xf-diag-box" style="margin-top:10px;display:none;padding:10px;border-radius:8px;font-size:12px;white-space:pre-wrap;word-break:break-all;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);"></div>';
 
       const btn = container.querySelector("#xf-diag-btn");
       const resBox = container.querySelector("#xf-diag-box");
 
       btn.onclick = async function () {
         const key = getCleanKey();
-        const base = getBaseUrl();
         resBox.style.display = "block";
 
         if (!key) {
-          resBox.innerHTML = '<span style="color:#ef4444;">请先在上方设置项中填写 API Key</span>';
+          resBox.innerHTML = '<span style="color:#ef4444;">请先在上方设置项中填写 SiliconFlow API Key</span>';
           return;
         }
 
-        resBox.innerHTML = "正在请求 " + base + "/models ...";
+        resBox.innerHTML = "正在连接 SiliconFlow 接口...";
 
         try {
-          const res = await (window.fetch || ctx.system.fetch)(base + "/models", {
+          const res = await window.fetch("https://api.siliconflow.cn/v1/models", {
             method: "GET",
             headers: { Authorization: "Bearer " + key }
           });
 
           if (!res.ok) {
             const errTxt = await res.text();
-            resBox.innerHTML = '<span style="color:#ef4444;">请求失败 [HTTP ' + res.status + ']</span><br>' + errTxt;
+            resBox.innerHTML = '<span style="color:#ef4444;">连接失败 [HTTP ' + res.status + ']</span><br>' + errTxt;
             return;
           }
 
@@ -286,18 +198,16 @@ export default {
           const list = data.data || [];
           const audioModels = list.filter(function (m) {
             const id = (m.id || "").toLowerCase();
-            return id.indexOf("voice") !== -1 || id.indexOf("audio") !== -1 || id.indexOf("sense") !== -1 || id.indexOf("whisper") !== -1 || id.indexOf("funaudio") !== -1 || id.indexOf("speech") !== -1;
+            return id.indexOf("sensevoice") !== -1 || id.indexOf("whisper") !== -1 || id.indexOf("speech") !== -1 || id.indexOf("funaudio") !== -1;
           });
 
-          let out = '<span style="color:#10b981;">Key 校验通过！共获取到 ' + list.length + ' 个可用模型</span><br>';
+          let out = '<span style="color:#10b981;">✓ 硅基流动连通成功！Key 有效。</span><br>';
           if (audioModels.length > 0) {
-            out += "<br><b>检测到 ASR 模型 (点击选用)：</b><br>";
+            out += "<br><b>当前可用 ASR 语音模型：</b><br>";
             for (let i = 0; i < audioModels.length; i++) {
               const m = audioModels[i];
               out += '<div class="xf-pick-item" data-id="' + m.id + '" style="padding:6px 8px;margin:5px 0;background:rgba(255,255,255,0.08);border-radius:6px;cursor:pointer;color:#60a5fa;display:flex;justify-content:space-between;align-items:center;"><span>' + m.id + '</span><span style="color:#a1a1aa;font-size:11px;">点击选用</span></div>';
             }
-          } else {
-            out += "<br>接口已连通，可直接使用默认推荐的模型名。<br>";
           }
 
           resBox.innerHTML = out;
@@ -307,16 +217,6 @@ export default {
             item.onclick = function () {
               const modelId = item.getAttribute("data-id");
               ctx.system.settings.set("modelName", modelId);
-              const allInputs = document.querySelectorAll("input[type='text'], input:not([type])");
-              for (let k = 0; k < allInputs.length; k++) {
-                const input = allInputs[k];
-                const row = input.closest("div, label, tr");
-                const label = row ? row.textContent : "";
-                if (label.indexOf("语音模型") !== -1 || label.indexOf("模型名称") !== -1) {
-                  input.value = modelId;
-                  input.dispatchEvent(new Event("input", { bubbles: true }));
-                }
-              }
               ctx.ui.toast("已选用模型: " + modelId);
             };
           }
@@ -334,7 +234,7 @@ export default {
         return false;
       }
       if (el.classList && el.classList.contains("chat-input-textarea")) return true;
-      if (el.closest(".chat-input-bar, .chat-room-main-pane") && (el.tagName === "TEXTAREA" || el.tagName === "INPUT")) {
+      if (el.closest(".chat-input-bar, .chat-room-main-pane, footer") && (el.tagName === "TEXTAREA" || el.tagName === "INPUT")) {
         return true;
       }
       return false;
@@ -433,7 +333,6 @@ export default {
       capsuleEl.classList.remove("cancel-mode", "warn-mode");
 
       try {
-        // 兼容全平台：先尝试标准音轨约束，被拒绝则回退到纯 true，杜绝 OverconstrainedError
         let stream = null;
         try {
           stream = await navigator.mediaDevices.getUserMedia({
@@ -444,18 +343,13 @@ export default {
               echoCancellation: true
             }
           });
-        } catch (mediaErr) {
+        } catch (e) {
           stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         }
+
         audioChunks = [];
 
-        const mimeTypes = [
-          "audio/webm;codecs=opus",
-          "audio/ogg;codecs=opus",
-          "audio/mp4",
-          "audio/aac",
-          "audio/webm"
-        ];
+        const mimeTypes = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/aac", "audio/ogg"];
         let selectedMime = "";
         for (let i = 0; i < mimeTypes.length; i++) {
           if (MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(mimeTypes[i])) {
@@ -463,8 +357,9 @@ export default {
             break;
           }
         }
+
         mediaRecorder = selectedMime
-          ? new MediaRecorder(stream, { mimeType: selectedMime, audioBitsPerSecond: 24000 })
+          ? new MediaRecorder(stream, { mimeType: selectedMime })
           : new MediaRecorder(stream);
 
         mediaRecorder.ondataavailable = function (e) {
@@ -489,10 +384,9 @@ export default {
             return;
           }
 
-          // 零延迟直传：无需等待，立即打包二进制并发送
           const currentMime = mediaRecorder.mimeType || (audioChunks[0] && audioChunks[0].type) || "audio/webm";
           const blob = new Blob(audioChunks, { type: currentMime });
-          await doUniversalTranscription(blob);
+          await doSiliconFlowTranscription(blob);
         };
 
         mediaRecorder.start(100);
@@ -531,28 +425,23 @@ export default {
       }
     };
 
-    async function doUniversalTranscription(blob) {
+    async function doSiliconFlowTranscription(blob) {
       const key = getCleanKey();
-      const base = getBaseUrl();
       const model = (ctx.system.settings.get("modelName") || "FunAudioLLM/SenseVoiceSmall").trim();
-      const language = ctx.system.settings.get("language") || "auto";
-      const cleanSense = ctx.system.settings.get("cleanSenseVoiceTags") !== false;
       const autoSend = ctx.system.settings.get("autoSend") === true;
 
-      if (!key && base.indexOf("/") !== 0) {
-        ctx.ui.toast("请在插件设置中填写 API Key！");
+      if (!key) {
+        ctx.ui.toast("请在插件设置中填写 SiliconFlow API Key！");
         return;
       }
 
-      const toast = ctx.ui.toast("正在极速转写…", { durationMs: 0 });
+      const toast = ctx.ui.toast("正在识别…", { durationMs: 0 });
       const abortCtrl = new AbortController();
-      // 上调超时为 35s，防止长语音或弱网时误触发超时截断
       const timeoutId = setTimeout(function () {
         abortCtrl.abort();
-      }, 35000);
+      }, 30000);
 
       try {
-        // 确保 Blob 有明确的 MIME 类型，避免 SiliconFlow 后端解析为 application/octet-stream 报错
         let mime = blob.type || "audio/webm";
         let ext = "webm";
         if (mime.indexOf("mp4") !== -1 || mime.indexOf("m4a") !== -1) { ext = "m4a"; mime = "audio/mp4"; }
@@ -566,26 +455,11 @@ export default {
         formData.append("file", audioFile);
         formData.append("model", model);
 
-        const isSenseVoice = model.toLowerCase().indexOf("sensevoice") !== -1;
-        if (!isSenseVoice && language && language !== "auto") {
-          formData.append("language", language);
-        }
-
-        const headers = {};
-        if (key) {
-          headers["Authorization"] = "Bearer " + key;
-        }
-
-        // 兼容 /v1/audio/transcriptions 与 /audio/transcriptions
-        let targetUrl = base;
-        if (!targetUrl.endsWith("/audio/transcriptions")) {
-          targetUrl = targetUrl + "/audio/transcriptions";
-        }
-
-        // 极速直连：直接使用原生 window.fetch 发送（不经过任何中转封装，耗时缩短至 200~400ms）
-        const res = await window.fetch(targetUrl, {
+        const res = await window.fetch(API_ENDPOINT, {
           method: "POST",
-          headers: headers,
+          headers: {
+            Authorization: "Bearer " + key
+          },
           body: formData,
           signal: abortCtrl.signal
         });
@@ -603,14 +477,13 @@ export default {
         } catch (e) {
           data = { text: resText };
         }
-        let text = (data.text || data.result || (typeof data === "string" ? data : "")).trim();
 
-        if (cleanSense) {
-          text = text.replace(/<\|.*?\|>/g, "").trim();
-        }
+        let text = (data.text || data.result || (typeof data === "string" ? data : "")).trim();
+        // 自动清洗 SenseVoice 的富文本标记 <|...|>
+        text = text.replace(/<\|.*?\|>/g, "").trim();
 
         if (!text) {
-          ctx.ui.toast("未识别到清晰语音");
+          ctx.ui.toast("未识别到声音");
           return;
         }
 
@@ -622,56 +495,55 @@ export default {
           });
           ctx.ui.toast("已发送");
         } else {
-          // 多选择器深度定位聊天输入框
-        const allTextareas = Array.from(document.querySelectorAll("textarea, input[type='text'], [contenteditable='true']"));
-        const target = activeInputEl || allTextareas.find(el => el.closest && el.closest(".chat-room-wrapper, .chat-input-bar, .page-container, footer, form")) || document.querySelector(".chat-input-textarea") || allTextareas[0];
+          const allTextareas = Array.from(document.querySelectorAll("textarea, input[type='text'], [contenteditable='true']"));
+          const target = activeInputEl || allTextareas.find(el => el.closest && el.closest(".chat-room-wrapper, .chat-input-bar, .page-container, footer, form")) || document.querySelector(".chat-input-textarea") || allTextareas[0];
 
-        if (target) {
-          if (target.isContentEditable) {
-            target.textContent = (target.textContent ? target.textContent + " " : "") + text;
-          } else {
-            const oldVal = target.value || "";
-            const nextVal = oldVal ? (oldVal + " " + text) : text;
-
-            const proto = window.HTMLTextAreaElement ? window.HTMLTextAreaElement.prototype : window.HTMLInputElement.prototype;
-            const desc = Object.getOwnPropertyDescriptor(proto, "value");
-            const nativeSetter = desc ? desc.set : null;
-
-            if (nativeSetter) {
-              nativeSetter.call(target, nextVal);
+          if (target) {
+            if (target.isContentEditable) {
+              target.textContent = (target.textContent ? target.textContent + " " : "") + text;
             } else {
-              target.value = nextVal;
+              const oldVal = target.value || "";
+              const nextVal = oldVal ? (oldVal + " " + text) : text;
+
+              const proto = window.HTMLTextAreaElement ? window.HTMLTextAreaElement.prototype : window.HTMLInputElement.prototype;
+              const desc = Object.getOwnPropertyDescriptor(proto, "value");
+              const nativeSetter = desc ? desc.set : null;
+
+              if (nativeSetter) {
+                nativeSetter.call(target, nextVal);
+              } else {
+                target.value = nextVal;
+              }
+            }
+
+            target.dispatchEvent(new Event("input", { bubbles: true }));
+            target.dispatchEvent(new Event("change", { bubbles: true }));
+            target.focus();
+
+            if (typeof target.setSelectionRange === "function") {
+              const len = (target.value || "").length;
+              target.setSelectionRange(len, len);
+            }
+
+            try {
+              await navigator.clipboard.writeText(text);
+            } catch (e) {}
+
+            ctx.ui.toast("✓ 转写成功：" + text.slice(0, 15) + (text.length > 15 ? "..." : ""));
+          } else {
+            try {
+              await navigator.clipboard.writeText(text);
+              ctx.ui.toast("已复制：" + text);
+            } catch (e) {
+              ctx.ui.toast("完成：" + text);
             }
           }
-
-          target.dispatchEvent(new Event("input", { bubbles: true }));
-          target.dispatchEvent(new Event("change", { bubbles: true }));
-          target.focus();
-
-          if (typeof target.setSelectionRange === "function") {
-            const len = (target.value || "").length;
-            target.setSelectionRange(len, len);
-          }
-
-          try {
-            await navigator.clipboard.writeText(text);
-          } catch (e) {}
-
-          ctx.ui.toast("✓ 转写成功：" + text.slice(0, 15) + (text.length > 15 ? "..." : ""));
-        } else {
-          try {
-            await navigator.clipboard.writeText(text);
-            ctx.ui.toast("已复制到剪贴板：" + text);
-          } catch (e) {
-            ctx.ui.toast("转写完成：" + text);
-          }
-        }
         }
       } catch (err) {
         clearTimeout(timeoutId);
         ctx.system.log("ASR 转写失败", err);
         if (err.name === "AbortError") {
-          ctx.ui.toast("转写超时，请检查网络");
+          ctx.ui.toast("转写超时");
         } else {
           ctx.ui.toast("转写失败: " + (err.message || err));
         }
