@@ -52,7 +52,8 @@ export default {
     const TAG_LONG = "memoryLongTerm";
     const TAG_SHORT_OPEN = "<shortTermMemory>";
     const TAG_SHORT_CLOSE = "</shortTermMemory>";
-    const CACHE_KEY = "mvh_emb_cache_v12";
+    // v14：修复旧版 query 缓存碰撞；旧缓存与当前检索逻辑不再复用。
+    const CACHE_KEY = "mvh_emb_cache_v14";
 
     const esc = (s) => String(s == null ? "" : s)
       .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -475,7 +476,8 @@ export default {
           ? cosine(qVec, m.embedding) : 0;
         const kwRes = kwScoreOf(i);
         const kw = kwRes.score;
-        const coarse = m?.embedding ? (0.5 * vec + 0.5 * kw) : (0.85 * kw);
+        // 向量是主要排序依据，关键词只作辅助；旧版 0.5/0.5 会让长句中的偶然二元词压过语义相似度。
+      const coarse = m?.embedding ? (0.8 * vec + 0.2 * kw) : (0.85 * kw);
         return {
           ...s,
           memText: m?.text || s.sentText,
@@ -495,7 +497,8 @@ export default {
       memBest.sort((a, b) => b.coarse - a.coarse);
 
       let usedRerank = false;
-      let pool = memBest.slice(0, Math.max(topK * 10, 30));
+      // 先保留较大的候选池，再交给 Rerank/阈值筛选，避免向量稍低的关联记忆提前出池。
+      let pool = memBest.slice(0, Math.max(topK * 20, 80));
       if (rerankConfig && pool.length > 0) {
         const docs = pool.map((c) => c.pureText || c.sentText);
         const rerankMap = await requestRerank(query, docs, rerankConfig);
@@ -522,8 +525,8 @@ export default {
         }
       }
 
-      const VEC_SUPPORT = 0.15;
-      const KW_SUPPORT = 0.50;
+      const VEC_SUPPORT = Math.max(0.10, Math.min(0.30, minSim * 0.75));
+      const KW_SUPPORT = Math.max(0.35, Math.min(0.50, kwBoost));
       const picked = [...guaranteed];
       const seen = new Set(guaranteed.map((g) => g.memId));
 
@@ -596,7 +599,7 @@ export default {
 
         let qVec = null;
         if (embedConfig && query) {
-          const qKey = "q:" + hash(query);
+          const qKey = "q:" + hash(retrievalQuery);
           qVec = cache[qKey];
           if (!qVec) {
             try {
