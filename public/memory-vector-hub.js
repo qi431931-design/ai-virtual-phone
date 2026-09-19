@@ -78,35 +78,49 @@ export default {
     }
 
     async function loadSystemApiConfigs() {
-      const db = await idbOpen(KV_DB);
+      // 宿主版本升级或隐私设置变化时，插件不能因为读取内部配置失败而阻塞聊天。
       try {
-        if (!db.objectStoreNames.contains("entries")) return [];
-        return await new Promise((res) => {
-          const tx = db.transaction("entries", "readonly");
-          const req = tx.objectStore("entries").get("ai_phone_api_configs_v1");
-          req.onsuccess = () => {
-            try {
-              const raw = req.result?.value;
-              res(raw ? JSON.parse(raw) : []);
-            } catch (e) { res([]); }
-          };
-          req.onerror = () => res([]);
-        });
-      } finally { db.close(); }
+        const db = await idbOpen(KV_DB);
+        try {
+          if (!db.objectStoreNames.contains("entries")) return [];
+          return await new Promise((res) => {
+            const tx = db.transaction("entries", "readonly");
+            const req = tx.objectStore("entries").get("ai_phone_api_configs_v1");
+            req.onsuccess = () => {
+              try {
+                const raw = req.result?.value;
+                const parsed = raw ? JSON.parse(raw) : [];
+                res(Array.isArray(parsed) ? parsed : []);
+              } catch (e) { res([]); }
+            };
+            req.onerror = () => res([]);
+            tx.onerror = () => res([]);
+          });
+        } finally { db.close(); }
+      } catch (e) {
+        ctx.system.log("[记忆中枢] 无法读取宿主 API 配置，已降级为关键词检索：", e?.message || String(e));
+        return [];
+      }
     }
 
     async function getLastSummaryTimestamp(charId) {
       if (!charId) return null;
-      const db = await idbOpen(KV_DB);
       try {
-        if (!db.objectStoreNames.contains("entries")) return null;
-        return await new Promise((res) => {
-          const tx = db.transaction("entries", "readonly");
-          const req = tx.objectStore("entries").get("ai_phone_mem_last_sum_" + charId);
-          req.onsuccess = () => res(req.result?.value || null);
-          req.onerror = () => res(null);
-        });
-      } finally { db.close(); }
+        const db = await idbOpen(KV_DB);
+        try {
+          if (!db.objectStoreNames.contains("entries")) return null;
+          return await new Promise((res) => {
+            const tx = db.transaction("entries", "readonly");
+            const req = tx.objectStore("entries").get("ai_phone_mem_last_sum_" + charId);
+            req.onsuccess = () => res(req.result?.value || null);
+            req.onerror = () => res(null);
+            tx.onerror = () => res(null);
+          });
+        } finally { db.close(); }
+      } catch (e) {
+        ctx.system.log("[记忆中枢] 无法读取摘要水位线，已使用全部短期消息：", e?.message || String(e));
+        return null;
+      }
     }
 
     function resolveEmbedUrl(config) {
@@ -209,43 +223,57 @@ export default {
 
     async function readLongMemories(charId) {
       if (!charId) return [];
-      const db = await idbOpen(MEM_DB);
       try {
-        if (!db.objectStoreNames.contains(MEM_STORE)) return [];
-        return await new Promise((res, rej) => {
-          const tx = db.transaction(MEM_STORE, "readonly");
-          const req = tx.objectStore(MEM_STORE).getAll();
-          req.onsuccess = () => {
-            const all = req.result || [];
-            res(all.filter((r) => r?.type === "long_term" && r?.characterId === charId));
-          };
-          req.onerror = () => rej(req.error);
-        });
-      } finally { db.close(); }
+        const db = await idbOpen(MEM_DB);
+        try {
+          if (!db.objectStoreNames.contains(MEM_STORE)) return [];
+          return await new Promise((res) => {
+            const tx = db.transaction(MEM_STORE, "readonly");
+            const req = tx.objectStore(MEM_STORE).getAll();
+            req.onsuccess = () => {
+              const all = Array.isArray(req.result) ? req.result : [];
+              res(all.filter((r) => r?.type === "long_term" && r?.characterId === charId));
+            };
+            req.onerror = () => res([]);
+            tx.onerror = () => res([]);
+          });
+        } finally { db.close(); }
+      } catch (e) {
+        ctx.system.log("[记忆中枢] 无法读取长期记忆，已降级为空库：", e?.message || String(e));
+        return [];
+      }
     }
 
     async function batchWriteEmbeddings(updates) {
-      if (updates.length === 0) return;
-      const db = await idbOpen(MEM_DB);
+      if (updates.length === 0) return false;
       try {
-        await new Promise((res, rej) => {
-          const tx = db.transaction(MEM_STORE, "readwrite");
-          const store = tx.objectStore(MEM_STORE);
-          updates.forEach(({ id, embedding }) => {
-            const getReq = store.get(id);
-            getReq.onsuccess = () => {
-              const item = getReq.result;
-              if (item) {
-                item.embedding = embedding;
-                item.updatedAt = new Date().toISOString();
-                store.put(item);
-              }
-            };
+        const db = await idbOpen(MEM_DB);
+        try {
+          if (!db.objectStoreNames.contains(MEM_STORE)) return false;
+          await new Promise((res, rej) => {
+            const tx = db.transaction(MEM_STORE, "readwrite");
+            const store = tx.objectStore(MEM_STORE);
+            updates.forEach(({ id, embedding }) => {
+              const getReq = store.get(id);
+              getReq.onsuccess = () => {
+                const item = getReq.result;
+                if (item) {
+                  item.embedding = embedding;
+                  item.updatedAt = new Date().toISOString();
+                  store.put(item);
+                }
+              };
+            });
+            tx.oncomplete = () => res();
+            tx.onerror = () => rej(tx.error);
+            tx.onabort = () => rej(tx.error || new Error("写入向量事务被中止"));
           });
-          tx.oncomplete = () => res();
-          tx.onerror = () => rej(tx.error);
-        });
-      } finally { db.close(); }
+          return true;
+        } finally { db.close(); }
+      } catch (e) {
+        ctx.system.log("[记忆中枢] 向量写入失败：", e?.message || String(e));
+        return false;
+      }
     }
 
     function stripThinking(text) {
@@ -1218,6 +1246,9 @@ export default {
       let hasMoved = false;
 
       const onPointerDown = (e) => {
+        if (e.pointerId != null && ball.setPointerCapture) {
+          try { ball.setPointerCapture(e.pointerId); } catch (ignore) {}
+        }
         isDragging = true;
         hasMoved = false;
         ball.style.cursor = "grabbing";
@@ -1244,8 +1275,11 @@ export default {
         ball.style.bottom = "auto";
       };
 
-      const onPointerUp = () => {
+      const onPointerUp = (e) => {
         if (!isDragging) return;
+        if (e?.pointerId != null && ball.releasePointerCapture) {
+          try { ball.releasePointerCapture(e.pointerId); } catch (ignore) {}
+        }
         isDragging = false;
         ball.style.cursor = "grab";
         ball.style.transform = "scale(1)";
