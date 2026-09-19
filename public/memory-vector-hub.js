@@ -540,24 +540,15 @@ export default {
         }
       }
 
-      const guaranteed = [];
       const sortedByKw = [...memBest].sort((a, b) => b.kw - a.kw);
       const gMax = Math.max(1, Math.floor(kwGuaranteeMax || 1));
-      for (const c of sortedByKw) {
-        if (guaranteed.length >= gMax) break;
-        if (c.kw < kwBoost) continue;
-        // 中文长句常常只命中一个稀有二元词，但该词可能已经足以唯一定位记忆。
-        // 不能再强制要求命中两个词，否则诊断分数 1.000 仍会被全部丢弃。
-        if (c.kw >= kwBoost) {
-          guaranteed.push({ ...c, source: "keyword" });
-        }
-      }
-
       const VEC_SUPPORT = Math.max(0.10, Math.min(0.30, minSim * 0.75));
       const KW_SUPPORT = Math.max(0.35, Math.min(0.50, kwBoost));
-      const picked = [...guaranteed];
-      const seen = new Set(guaranteed.map((g) => g.memId));
+      const picked = [];
+      const seen = new Set();
 
+      // 先按向量/Rerank 召回。旧版先“关键词保送”，导致只要命中一个中文二元词，
+      // 结果就会被标成 keyword，用户会误以为完全没有使用向量。
       for (const c of pool) {
         if (picked.length >= topK) break;
         if (seen.has(c.memId)) continue;
@@ -566,13 +557,22 @@ export default {
           const rerankPass = c.rerank >= rerankMinScore;
           const supportPass = c.vec >= VEC_SUPPORT || c.kw >= KW_SUPPORT;
           if (!rerankPass || !supportPass) continue;
-        } else {
-          const noRerankPass = c.vec >= minSim || c.kw >= KW_SUPPORT;
-          if (!noRerankPass) continue;
+        } else if (c.vec < minSim && c.kw < KW_SUPPORT) {
+          continue;
         }
 
-        picked.push(c);
+        picked.push({ ...c, source: c.vec >= minSim ? "vector" : "normal" });
         seen.add(c.memId);
+      }
+
+      // 只有向量没有召回满时，才追加关键词兜底；关键词不再抢占向量名额。
+      let keywordAdded = 0;
+      for (const c of sortedByKw) {
+        if (picked.length >= topK || keywordAdded >= gMax) break;
+        if (seen.has(c.memId) || c.kw < kwBoost) continue;
+        picked.push({ ...c, source: "keyword" });
+        seen.add(c.memId);
+        keywordAdded++;
       }
 
       return {
@@ -691,6 +691,7 @@ export default {
             text: p.memText, hitSentence: p.sentText, hitQuery: p.kwQuery,
             score: p.final, vec: p.vec, kw: p.kw, rerank: p.rerank,
             source: p.source, kwHitCount: p.kwHitCount,
+            matchMode: p.source === "keyword" ? "关键词兜底" : (p.source === "vector" ? "向量" : (p.rerank != null ? "Rerank" : "混合")),
           }));
           // 正常检索也写入插件日志；不记录聊天原文，便于排查漏召回问题。
           ctx.system.log("[记忆中枢] 检索完成", {
