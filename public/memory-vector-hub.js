@@ -657,6 +657,16 @@ export default {
             score: p.final, vec: p.vec, kw: p.kw, rerank: p.rerank,
             source: p.source, kwHitCount: p.kwHitCount,
           }));
+          // 正常检索也写入插件日志；不记录聊天原文，便于排查漏召回问题。
+          ctx.system.log("[记忆中枢] 检索完成", {
+            characterId: targetCharId || "",
+            candidates: diag?.sentCount || 0,
+            hits: picked.length,
+            topVector: Number.isFinite(picked[0]?.vec) ? Number(picked[0].vec.toFixed(3)) : 0,
+            topKeyword: Number.isFinite(diag?.topKw) ? Number(diag.topKw.toFixed(3)) : 0,
+            topCoarse: Number.isFinite(diag?.topCoarse) ? Number(diag.topCoarse.toFixed(3)) : 0,
+            usedRerank: Boolean(rerankConfig),
+          });
 
           for (let i = 0; i < messages.length; i++) {
             if (typeof messages[i]?.content !== "string") continue;
