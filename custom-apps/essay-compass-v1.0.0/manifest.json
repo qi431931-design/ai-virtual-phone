@@ -1,0 +1,21 @@
+{
+  "sdkVersion": "1.0",
+  "id": "essay.compass",
+  "name": "议论文 compass",
+  "version": "1.0.0",
+  "author": "Float 官方",
+  "description": "给高中生用的议论文写作训练工具：拆步骤、存题目、和角色短聊求提示，不代写作文。支持 Minimax 语音朗读。",
+  "icon": "icon.svg",
+  "entry": "index.html",
+  "permissions": [
+    "app.data.read",
+    "app.data.write",
+    "characters.read",
+    "ai.generate",
+    "voice.readProfiles",
+    "voice.tts",
+    "voice.play",
+    "ui.toast"
+  ],
+  "resources": { "assets": ["icon.svg"] }
+}
