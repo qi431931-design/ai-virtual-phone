@@ -585,6 +585,7 @@ export default {
         // 否则 query 会被聊天上下文污染，真正相关的记忆会被大量无关二元词稀释。
         const rawQuery = currentPrompt || prevAssistantPrompt;
         const query = sanitizeForEmbedding(rawQuery) || currentPrompt || prevAssistantPrompt || "聊天";
+        // 记忆插件只负责检索，不重写或移除宿主已经组装好的世界书内容。
         // 同一条 query 的关键词检索不应受聊天轮数影响；限制长度避免长消息造成候选词被稀释。
         const retrievalQuery = query.slice(-500);
 
@@ -715,6 +716,13 @@ export default {
 
           payload.messages = messages.filter((msg, idx) => {
             if (idx > shortStartIdx && idx < shortEndIdx) {
+              const content = typeof msg?.content === "string" ? msg.content : "";
+              // 世界书、系统提示和工具上下文不能被短期记忆裁剪误删。
+              // 旧版只按下标过滤，宿主若把世界书放在 shortTermMemory 区间内就会丢失。
+              const isProtectedContext = msg?.role === "system" || msg?.role === "tool"
+                || /<(?:worldBook|worldbook|world_book|world-book)\b/i.test(content)
+                || /(?:世界书|世界观|worldbook)/i.test(content);
+              if (isProtectedContext) return true;
               if (!keep.has(idx)) return false;
               if (msg.role === "assistant" && typeof msg.content === "string") {
                 msg.content = stripThinking(msg.content);
