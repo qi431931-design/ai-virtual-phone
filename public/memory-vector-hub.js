@@ -515,9 +515,9 @@ export default {
       for (const c of sortedByKw) {
         if (guaranteed.length >= gMax) break;
         if (c.kw < kwBoost) continue;
-        const qLen = (c.kwQuery || "").length;
-        const isShortQuery = qLen <= 4;
-        if (isShortQuery || c.kwHitCount >= 2) {
+        // 中文长句常常只命中一个稀有二元词，但该词可能已经足以唯一定位记忆。
+        // 不能再强制要求命中两个词，否则诊断分数 1.000 仍会被全部丢弃。
+        if (c.kw >= kwBoost) {
           guaranteed.push({ ...c, source: "keyword" });
         }
       }
@@ -578,8 +578,12 @@ export default {
           }
         }
 
-        const rawQuery = (prevAssistantPrompt ? (prevAssistantPrompt + " ") : "") + currentPrompt;
-        const query = sanitizeForEmbedding(rawQuery) || currentPrompt || "聊天";
+        // 长期记忆检索只使用最新用户消息，不能把上一条角色长回复拼进 query。
+        // 否则 query 会被聊天上下文污染，真正相关的记忆会被大量无关二元词稀释。
+        const rawQuery = currentPrompt || prevAssistantPrompt;
+        const query = sanitizeForEmbedding(rawQuery) || currentPrompt || prevAssistantPrompt || "聊天";
+        // 同一条 query 的关键词检索不应受聊天轮数影响；限制长度避免长消息造成候选词被稀释。
+        const retrievalQuery = query.slice(-500);
 
         const allConfigs = await loadSystemApiConfigs();
         const embedConfigId = ctx.system.storage.get("chosenEmbedConfigId");
@@ -596,7 +600,7 @@ export default {
           qVec = cache[qKey];
           if (!qVec) {
             try {
-              qVec = await withTimeout(requestEmbedding(query, embedConfig), 4000, "实时向量计算");
+              qVec = await withTimeout(requestEmbedding(retrievalQuery, embedConfig), 4000, "实时向量计算");
               cache[qKey] = qVec;
               saveCache(cache);
             } catch (e) {
@@ -642,7 +646,7 @@ export default {
           const rerankMinScore = Number(ctx.system.settings.get("rerankMinScore") ?? 0.50);
 
           const { picked, diag } = await retrieveLongMemories(
-            targetCharId, query, qVec, topK, minSim, kwBoost, rerankConfig, kwGuaranteeMax, rerankMinScore
+            targetCharId, retrievalQuery, qVec, topK, minSim, kwBoost, rerankConfig, kwGuaranteeMax, rerankMinScore
           );
           longDiag = diag;
           finalLongList = picked.map((p) => ({
