@@ -942,6 +942,12 @@ export default {
                     ✓ 长期记忆已 100% 具备纯净语义向量。
                   </div>
                 `}
+                ${longMemories.length > 0 ? `
+                  <button id="mvhRebuildBtn" style="width:100%;padding:8px;border-radius:8px;border:1px solid #dc2626;background:#fff;color:#dc2626;font-weight:700;cursor:pointer;margin-top:10px;">
+                    🔄 使用当前 Embedding 配置重建全部向量 (${longMemories.length} 条)
+                  </button>
+                  <div id="mvhRebuildLog" style="font-size:11px;margin-top:6px;color:#b45309;white-space:pre-wrap;"></div>
+                ` : ""}
               </div>
             `;
 
@@ -1150,6 +1156,51 @@ export default {
               document.body.removeChild(a);
               URL.revokeObjectURL(url);
               ctx.ui.toast("记忆文件导出成功！");
+            };
+
+            const rebuildBtn = el.querySelector("#mvhRebuildBtn");
+            const rebuildLog = el.querySelector("#mvhRebuildLog");
+            if (rebuildBtn) rebuildBtn.onclick = async () => {
+              const cfg = systemConfigs.find((c) => c.id === chosenEmbedConfigId) || systemConfigs[0];
+              if (!cfg) {
+                rebuildLog.textContent = "找不到 Embedding 配置，请先在设置中配置并重新打开插件。";
+                return;
+              }
+              const ok = window.confirm("这会用当前 Embedding 模型覆盖全部长期记忆向量，确定继续吗？");
+              if (!ok) return;
+              rebuildBtn.disabled = true;
+              rebuildBtn.textContent = "正在重建全部向量...";
+              rebuildLog.style.color = "#b45309";
+              try {
+                const BATCH_SIZE = 10;
+                let doneCount = 0;
+                for (let i = 0; i < longMemories.length; i += BATCH_SIZE) {
+                  const chunk = longMemories.slice(i, i + BATCH_SIZE);
+                  const texts = chunk.map((item) => sanitizeForEmbedding(cleanDisplay(item.content)));
+                  rebuildLog.textContent = `重建进度：${doneCount}/${longMemories.length}`;
+                  let vectors;
+                  try {
+                    vectors = await withTimeout(requestEmbedding(texts, cfg), 20000, "批量向量重建");
+                  } catch (e) {
+                    vectors = await Promise.all(texts.map((t) => withTimeout(requestEmbedding(t, cfg), 10000, "向量重建")));
+                  }
+                  const updates = chunk.map((item, idx) => ({ id: item.id, embedding: vectors[idx] }))
+                    .filter((u) => Array.isArray(u.embedding) && u.embedding.length > 0);
+                  const saved = await batchWriteEmbeddings(updates);
+                  if (!saved) throw new Error("向量写入数据库失败");
+                  doneCount += chunk.length;
+                }
+                try { ctx.system.storage.remove(CACHE_KEY); } catch (ignore) {}
+                rebuildLog.style.color = "#059669";
+                rebuildLog.textContent = `✓ 已使用当前模型重建 ${doneCount} 条向量。请重新发消息测试。`;
+                ctx.ui.toast("全部长期记忆向量已重建");
+                setTimeout(refresh, 1000);
+              } catch (err) {
+                rebuildLog.style.color = "#dc2626";
+                rebuildLog.textContent = "重建失败：" + (err?.message || String(err));
+                rebuildBtn.disabled = false;
+                rebuildBtn.textContent = "重试重建全部向量";
+              }
             };
 
             const fillBtn = el.querySelector("#mvhFillBtn");
