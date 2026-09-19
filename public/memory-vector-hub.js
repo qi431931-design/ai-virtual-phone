@@ -222,8 +222,21 @@ export default {
       } catch (e) {}
     }
 
-    async function readLongMemories(charId) {
+    // 长期记忆缓存：同一角色在一次插件生命周期内只读一次 IndexedDB。
+    const memoryCache = new Map();
+    const memoryCacheVersion = new Map();
+    const invalidateMemoryCache = (charId) => {
+      if (charId) memoryCache.delete(charId);
+    };
+
+    function getEmbeddingFingerprint(config) {
+      if (!config) return "none";
+      return [config.provider || "", config.baseUrl || "", resolveEmbedModel(config)].join("|");
+    }
+
+    async function readLongMemories(charId, force = false) {
       if (!charId) return [];
+      if (!force && memoryCache.has(charId)) return memoryCache.get(charId);
       try {
         const db = await idbOpen(MEM_DB);
         try {
@@ -233,7 +246,9 @@ export default {
             const req = tx.objectStore(MEM_STORE).getAll();
             req.onsuccess = () => {
               const all = Array.isArray(req.result) ? req.result : [];
-              res(all.filter((r) => r?.type === "long_term" && r?.characterId === charId));
+              const filtered = all.filter((r) => r?.type === "long_term" && r?.characterId === charId);
+              memoryCache.set(charId, filtered);
+              res(filtered);
             };
             req.onerror = () => res([]);
             tx.onerror = () => res([]);
@@ -245,7 +260,7 @@ export default {
       }
     }
 
-    async function batchWriteEmbeddings(updates) {
+    async function batchWriteEmbeddings(updates, embeddingMeta = {}) {
       if (updates.length === 0) return false;
       try {
         const db = await idbOpen(MEM_DB);
@@ -260,6 +275,10 @@ export default {
                 const item = getReq.result;
                 if (item) {
                   item.embedding = embedding;
+                  item.embeddingModel = embeddingMeta.model || item.embeddingModel || "";
+                  item.embeddingProvider = embeddingMeta.provider || item.embeddingProvider || "";
+                  item.embeddingDimension = Array.isArray(embedding) ? embedding.length : 0;
+                  item.embeddingUpdatedAt = new Date().toISOString();
                   item.updatedAt = new Date().toISOString();
                   store.put(item);
                 }
@@ -398,7 +417,7 @@ export default {
       return clean.length >= 2 ? clean : String(rawText).trim();
     }
 
-    async function retrieveLongMemories(charId, query, qVec, topK, minSim, kwBoost, rerankConfig, kwGuaranteeMax, rerankMinScore) {
+    async function retrieveLongMemories(charId, query, qVec, topK, minSim, kwBoost, rerankConfig, kwGuaranteeMax, rerankMinScore, embedFingerprint) {
       const dbRows = await readLongMemories(charId);
       const mems = dbRows
         .map((r) => {
@@ -408,6 +427,9 @@ export default {
             text: disp,
             pureText: sanitizeForEmbedding(disp),
             embedding: Array.isArray(r.embedding) && r.embedding.length > 0 ? r.embedding : null,
+            embeddingModel: r.embeddingModel || r.embedding_model || "",
+            embeddingDimension: Number(r.embeddingDimension || r.embedding_dimension || (Array.isArray(r.embedding) ? r.embedding.length : 0)),
+            embeddingUpdatedAt: r.embeddingUpdatedAt || r.embedding_updated_at || "",
           };
         })
         .filter((c) => c.pureText.length >= 2);
@@ -470,9 +492,15 @@ export default {
       };
 
       const memById = new Map(mems.map((m) => [m.id, m]));
+      let dimensionMismatchCount = 0;
+      let modelMismatchCount = 0;
       const scored = sents.map((s, i) => {
         const m = memById.get(s.memId);
-        const vec = (m?.embedding && qVec && m.embedding.length === qVec.length)
+        const dimensionMismatch = Boolean(m?.embedding && qVec && m.embedding.length !== qVec.length);
+        const modelMismatch = Boolean(m?.embeddingModel && embedFingerprint && !embedFingerprint.includes(m.embeddingModel));
+        if (dimensionMismatch) dimensionMismatchCount++;
+        if (modelMismatch) modelMismatchCount++;
+        const vec = (m?.embedding && qVec && !dimensionMismatch && !modelMismatch)
           ? cosine(qVec, m.embedding) : 0;
         const kwRes = kwScoreOf(i);
         const kw = kwRes.score;
@@ -556,6 +584,11 @@ export default {
           topKwQuery: sortedByKw[0]?.kwQuery,
           topKwHitCount: sortedByKw[0]?.kwHitCount,
           topCoarse: memBest[0]?.coarse,
+          topVector: memBest[0]?.vec,
+          dimensionMismatchCount,
+          modelMismatchCount,
+          embeddingModel: embedFingerprint || "none",
+          embeddingDimension: qVec?.length || 0,
         },
       };
     }
@@ -594,13 +627,14 @@ export default {
         const rerankConfigId = ctx.system.storage.get("chosenRerankConfigId");
         const embedConfig = allConfigs.find((c) => c.id === embedConfigId) || allConfigs[0];
         const rerankConfig = allConfigs.find((c) => c.id === rerankConfigId) || null;
+        const embedFingerprint = getEmbeddingFingerprint(embedConfig);
 
         const cache = loadCache();
         const hash = (s) => s.slice(0, 30) + "_" + s.length;
 
         let qVec = null;
         if (embedConfig && query) {
-          const qKey = "q:" + hash(retrievalQuery);
+          const qKey = "q:" + embedFingerprint + ":" + hash(retrievalQuery);
           qVec = cache[qKey];
           if (!qVec) {
             try {
@@ -650,7 +684,7 @@ export default {
           const rerankMinScore = Number(ctx.system.settings.get("rerankMinScore") ?? 0.50);
 
           const { picked, diag } = await retrieveLongMemories(
-            targetCharId, retrievalQuery, qVec, topK, minSim, kwBoost, rerankConfig, kwGuaranteeMax, rerankMinScore
+            targetCharId, retrievalQuery, qVec, topK, minSim, kwBoost, rerankConfig, kwGuaranteeMax, rerankMinScore, embedFingerprint
           );
           longDiag = diag;
           finalLongList = picked.map((p) => ({
@@ -663,9 +697,15 @@ export default {
             characterId: targetCharId || "",
             candidates: diag?.sentCount || 0,
             hits: picked.length,
+            cache: memoryCache.has(targetCharId) ? "hit" : "miss",
             topVector: Number.isFinite(picked[0]?.vec) ? Number(picked[0].vec.toFixed(3)) : 0,
             topKeyword: Number.isFinite(diag?.topKw) ? Number(diag.topKw.toFixed(3)) : 0,
             topCoarse: Number.isFinite(diag?.topCoarse) ? Number(diag.topCoarse.toFixed(3)) : 0,
+            topVector: Number.isFinite(diag?.topVector) ? Number(diag.topVector.toFixed(3)) : 0,
+            dimensionMismatch: diag?.dimensionMismatchCount || 0,
+            modelMismatch: diag?.modelMismatchCount || 0,
+            embeddingModel: diag?.embeddingModel || "none",
+            embeddingDimension: diag?.embeddingDimension || 0,
             usedRerank: Boolean(rerankConfig),
           });
 
@@ -1194,11 +1234,14 @@ export default {
                   }
                   const updates = chunk.map((item, idx) => ({ id: item.id, embedding: vectors[idx] }))
                     .filter((u) => Array.isArray(u.embedding) && u.embedding.length > 0);
-                  const saved = await batchWriteEmbeddings(updates);
+                  const saved = await batchWriteEmbeddings(updates, {
+                    model: resolveEmbedModel(cfg), provider: cfg.provider || ""
+                  });
                   if (!saved) throw new Error("向量写入数据库失败");
                   doneCount += chunk.length;
                 }
                 try { ctx.system.storage.remove(CACHE_KEY); } catch (ignore) {}
+                invalidateMemoryCache(currentCharId);
                 rebuildLog.style.color = "#059669";
                 rebuildLog.textContent = `✓ 已使用当前模型重建 ${doneCount} 条向量。请重新发消息测试。`;
                 ctx.ui.toast("全部长期记忆向量已重建");
@@ -1244,8 +1287,12 @@ export default {
                   })).filter((u) => Array.isArray(u.embedding) && u.embedding.length > 0);
 
                   if (updates.length > 0) {
-                    await batchWriteEmbeddings(updates);
+                    const saved = await batchWriteEmbeddings(updates, {
+                      model: resolveEmbedModel(cfg), provider: cfg.provider || ""
+                    });
+                    if (!saved) throw new Error("向量写入数据库失败");
                   }
+                  invalidateMemoryCache(currentCharId);
                   doneCount += chunk.length;
                 }
 
