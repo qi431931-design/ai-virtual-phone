@@ -21,10 +21,10 @@ function scopeCss(css) {
   });
 }
 const SUPPORTED_SPEECH_TAGS = ["(laughs)", "(chuckle)", "(coughs)", "(clear-throat)", "(groans)", "(breath)", "(pant)", "(inhale)", "(exhale)", "(gasps)", "(sniffs)", "(sighs)", "(snorts)", "(burps)", "(lip-smacking)", "(humming)", "(hissing)", "(emm)", "(sneezes)"];
-const SUPPORTED_TAG_RE = /\\((laughs|chuckle|coughs|clear-throat|groans|breath|pant|inhale|exhale|gasps|sniffs|sighs|snorts|burps|lip-smacking|humming|hissing|emm|sneezes)\\)/g;
+const SUPPORTED_TAG_RE = /\((laughs|chuckle|coughs|clear-throat|groans|breath|pant|inhale|exhale|gasps|sniffs|sighs|snorts|burps|lip-smacking|humming|hissing|emm|sneezes)\)/g;
 
 function cleanSpeechTags(text) {
-  return String(text || "").replace(SUPPORTED_TAG_RE, (_, tag) => `(${tag})`).replace(/\\([^)]*\\)/g, "").replace(/[<>「」『』【】[\\]{}（）]/g, " ").replace(/\\s{2,}/g, " ").trim();
+  return String(text || "").replace(SUPPORTED_TAG_RE, (_, tag) => `(${tag})`).replace(/\((?!laughs\)|chuckle\)|coughs\)|clear-throat\)|groans\)|breath\)|pant\)|inhale\)|exhale\)|gasps\)|sniffs\)|sighs\)|snorts\)|burps\)|lip-smacking\)|humming\)|hissing\)|emm\)|sneezes\))[^)]*\)/g, "").replace(/[<>「」『』【】[\]{}（）]/g, " ").replace(/\s{2,}/g, " ").trim();
 }
 
 function audioData(json) {
