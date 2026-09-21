@@ -20,6 +20,13 @@ function scopeCss(css) {
     return `${prefix}\n${scoped} {`;
   });
 }
+const SUPPORTED_SPEECH_TAGS = ["(laughs)", "(chuckle)", "(coughs)", "(clear-throat)", "(groans)", "(breath)", "(pant)", "(inhale)", "(exhale)", "(gasps)", "(sniffs)", "(sighs)", "(snorts)", "(burps)", "(lip-smacking)", "(humming)", "(hissing)", "(emm)", "(sneezes)"];
+const SUPPORTED_TAG_RE = /\\((laughs|chuckle|coughs|clear-throat|groans|breath|pant|inhale|exhale|gasps|sniffs|sighs|snorts|burps|lip-smacking|humming|hissing|emm|sneezes)\\)/g;
+
+function cleanSpeechTags(text) {
+  return String(text || "").replace(SUPPORTED_TAG_RE, (_, tag) => `(${tag})`).replace(/\\([^)]*\\)/g, "").replace(/[<>「」『』【】[\\]{}（）]/g, " ").replace(/\\s{2,}/g, " ").trim();
+}
+
 function audioData(json) {
   const a = json?.data?.audio || json?.audio;
   if (a) return /^[0-9a-f]+$/i.test(a) ? hexAudio(a) : `data:audio/mp3;base64,${a}`;
@@ -32,7 +39,7 @@ export default {
     id: ID,
     name: "声阅 Mini · 边聊边听",
     apiVersion: 1,
-    version: "1.1.0",
+    version: "1.2.0",
     author: "qi431931-design",
     description: "聊天界面迷你听书：导入 TXT 或粘贴文本，Minimax 逐段朗读；每段结束自动暂停。",
     permissions: ["chat.read", "ui", "network", "storage"],
@@ -45,6 +52,7 @@ export default {
       { key: "speed", label: "语速", type: "number", default: 1 },
       { key: "volume", label: "音量", type: "number", default: 1 },
       { key: "continuous", label: "自动连续播放", type: "boolean", default: false, description: "关闭时每段结束自动暂停；开启后自动播放下一段。" },
+      { key: "preprocess", label: "AI 文本预处理", type: "boolean", default: false, description: "朗读前优化停顿和语气；只允许内置的 19 种 Minimax 语气词。" },
       { key: "preloadCount", label: "预生成接下来几段", type: "number", default: 5, description: "点击预生成后，提前请求并缓存音频。" },
       { key: "customCss", label: "自定义 CSS", type: "text", default: "", description: "只作用于声阅 Mini；建议使用 .sy-mini-bar、.sy-modal 等声阅 Mini 类名。" },
     ],
@@ -74,7 +82,12 @@ export default {
       const key = String(get("apiKey") || "").trim(), group = String(get("groupId") || "").trim();
       if (!key || !group) throw new Error("请先在插件设置中填写 Minimax API Key 和 Group ID");
       const endpoint = String(get("endpoint") || ENDPOINT);
-      const response = await ctx.system.fetch(`${endpoint}${endpoint.includes("?") ? "&" : "?"}GroupId=${encodeURIComponent(group)}`, { method: "POST", headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" }, body: JSON.stringify({ model: get("model") || "speech-2.8-turbo", text, stream: false, voice_setting: { voice_id: get("voiceId") || "male-qn-qingse", speed: Number(get("speed")) || 1, vol: Number(get("volume")) || 1, pitch: 0 }, audio_setting: { sample_rate: 32000, bitrate: 128000, format: "mp3", channel: 1 } }) });
+      let speechText = cleanSpeechTags(text);
+      if (get("preprocess") === true && ctx.ai?.chat) {
+        const processed = await ctx.ai.chat({ system: `你是有声书 TTS 文本预处理器。保持事实、人物、顺序和原意，不要解释。只可使用这些语气词：${SUPPORTED_SPEECH_TAGS.join(" ")}。不要创造任何其他括号标签；不需要语气词就不要添加。只输出处理后的朗读文本。`, prompt: speechText, temperature: 0.2, maxTokens: Math.max(256, speechText.length * 2) });
+        speechText = cleanSpeechTags(processed || speechText);
+      }
+      const response = await ctx.system.fetch(`${endpoint}${endpoint.includes("?") ? "&" : "?"}GroupId=${encodeURIComponent(group)}`,  { method: "POST", headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" }, body: JSON.stringify({ model: get("model") || "speech-2.8-turbo", text: speechText, stream: false, voice_setting: { voice_id: get("voiceId") || "male-qn-qingse", speed: Number(get("speed")) || 1, vol: Number(get("volume")) || 1, pitch: 0 }, audio_setting: { sample_rate: 32000, bitrate: 128000, format: "mp3", channel: 1 } }) });
       if (!response.ok) throw new Error(`Minimax 请求失败（HTTP ${response.status}）`);
       return audioData(await response.json());
     }
@@ -148,7 +161,7 @@ export default {
       refresh(); return () => { state.bar = null; stop(); };
     });
     ctx.ui.slot("chat.inputToolbar", el => { const b = document.createElement("button"); b.textContent = "声阅 Mini"; b.style.cssText = "border:0;border-radius:9px;padding:7px 10px;background:#7657d9;color:#fff"; b.onclick = open; el.appendChild(b); return () => b.remove(); });
-    ctx.system.log("声阅 Mini v1.1.0 已启动：每段自动暂停，支持贴边隐藏和自定义 CSS");
+    ctx.system.log("声阅 Mini v1.2.0 已启动：支持分段预生成、连续播放、贴边隐藏、作用域 CSS 和受限语气词预处理");
     return () => { css(); stop(); };
   },
 };
