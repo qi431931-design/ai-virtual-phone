@@ -2,12 +2,19 @@ const ENDPOINT="https://api.minimax.chat/v1/t2a_v2",ID="mini-listen-minimax";
 const TAGS=["laughs","chuckle","coughs","clear-throat","groans","breath","pant","inhale","exhale","gasps","sniffs","sighs","snorts","burps","lip-smacking","humming","hissing","emm","sneezes"];
 const TAG_RE=new RegExp("\\\\(("+TAGS.join("|")+"|[^)]*)\\\\)","g");
 function split(t,max=500){
-  const source=String(t||"").replace(/\r/g,"").split(/\n+/).map(x=>x.trim()).filter(Boolean),out=[],size=Math.max(120,Math.min(2000,Number(max)||500));
-  for(const line of source){
-    if(line.length<=max){out.push(line);continue}
-    let rest=line;
-    while(rest.length>size){let cut=size,last=Math.max(rest.lastIndexOf("。",size),rest.lastIndexOf("！",size),rest.lastIndexOf("？",size),rest.lastIndexOf("；",size),rest.lastIndexOf("，",size));if(last>Math.floor(size*.55))cut=last+1;out.push(rest.slice(0,cut).trim());rest=rest.slice(cut).trim()}if(rest)out.push(rest)
-  }return out
+  const lines=String(t||"").replace(/\r/g,"").split(/\n+/).map(x=>x.trim()).filter(Boolean);
+  const size=Math.max(120,Math.min(2000,Number(max)||500)), out=[];
+  let buffer="";
+  const flush=force=>{
+    while(buffer.length>size){
+      let cut=size;
+      for(const mark of ["。","！","？","；","，","、"]){const p=buffer.lastIndexOf(mark,size);if(p>=Math.floor(size*.55)){cut=Math.max(cut,p+1);break}}
+      out.push(buffer.slice(0,cut).trim());buffer=buffer.slice(cut).trim();
+    }
+    if(force&&buffer){out.push(buffer);buffer="";}
+  };
+  for(const line of lines){buffer+=(buffer?"\n":"")+line;flush(false);}
+  flush(true);return out;
 }
 function clean(t){return String(t||"").replace(TAG_RE,(m,n)=>TAGS.includes(n)?`(${n})`:"").replace(/[<>「」『』【】[\]{}（）]/g," ").replace(/\s{2,}/g," ").trim()}
 function hex(h){const b=new Uint8Array(h.length/2|0);for(let i=0;i<b.length;i++)b[i]=parseInt(h.slice(i*2,i*2+2),16);let s="";for(let i=0;i<b.length;i+=32768)s+=String.fromCharCode(...b.subarray(i,i+32768));return`data:audio/mp3;base64,${btoa(s)}`}
