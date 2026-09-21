@@ -39,7 +39,7 @@ export default {
     id: ID,
     name: "声阅 Mini · 边聊边听",
     apiVersion: 1,
-    version: "1.2.0",
+    version: "1.3.0",
     author: "qi431931-design",
     description: "聊天界面迷你听书：导入 TXT 或粘贴文本，Minimax 逐段朗读；每段结束自动暂停。",
     permissions: ["chat.read", "ui", "network", "storage"],
@@ -160,8 +160,27 @@ export default {
       el.querySelector("[data-edge]").onclick = () => { state.hidden = !state.hidden; el.classList.toggle("sy-hidden", state.hidden); el.querySelector("[data-edge]").textContent = state.hidden ? "›" : "‹"; };
       refresh(); return () => { state.bar = null; stop(); };
     });
-    ctx.ui.slot("chat.inputToolbar", el => { const b = document.createElement("button"); b.textContent = "声阅 Mini"; b.style.cssText = "border:0;border-radius:9px;padding:7px 10px;background:#7657d9;color:#fff"; b.onclick = open; el.appendChild(b); return () => b.remove(); });
-    ctx.system.log("声阅 Mini v1.2.0 已启动：支持分段预生成、连续播放、贴边隐藏、作用域 CSS 和受限语气词预处理");
+    ctx.ui.slot("chat.inputToolbar", el => {
+      const wrap = document.createElement("div");
+      wrap.style.cssText = "display:flex;gap:6px;align-items:center;flex-wrap:wrap;";
+      const openButton = document.createElement("button");
+      openButton.textContent = "声阅 Mini";
+      const toggleButton = document.createElement("button");
+      const buttonCss = "border:0;border-radius:9px;padding:7px 10px;background:#7657d9;color:#fff";
+      openButton.style.cssText = buttonCss;
+      toggleButton.style.cssText = buttonCss + ";background:transparent;color:inherit;border:1px solid currentColor";
+      const syncToggle = () => {
+        toggleButton.textContent = state.hidden ? "显示听书窗" : "隐藏听书窗";
+        if (state.bar) state.bar.classList.toggle("sy-hidden", state.hidden);
+      };
+      openButton.onclick = open;
+      toggleButton.onclick = () => { state.hidden = !state.hidden; syncToggle(); };
+      wrap.append(openButton, toggleButton);
+      el.appendChild(wrap);
+      syncToggle();
+      return () => wrap.remove();
+    });
+    ctx.system.log("声阅 Mini v1.3.0 已启动：支持加号面板隐藏听书窗、分段预生成、连续播放、作用域 CSS 和受限语气词预处理");
     return () => { css(); stop(); };
   },
 };
