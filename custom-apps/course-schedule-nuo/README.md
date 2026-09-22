@@ -17,10 +17,8 @@
 
 ## 已移除
 
-- 多周与多方案存档
-- 原生日历同步
 - 分享给角色
-- 外部 CDN 与 DOCX 解析依赖
+- 外部 CDN 依赖
 
 DOCX 可直接选择导入；应用会在本地读取 DOCX 内的 `word/document.xml`，不需要外部脚本。若目标浏览器不支持 `DecompressionStream`，再将 DOCX 另存为 TXT、CSV 或 HTML。应用不包含外部网络资源，也不内置 API key。
 
