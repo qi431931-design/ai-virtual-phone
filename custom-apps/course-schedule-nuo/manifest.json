@@ -2,10 +2,10 @@
   "id": "course-schedule-private",
   "name": "课程表",
   "version": "2.0.0",
-  "author": "qi431931-design",
-  "description": "用于记录个人每周课程的轻量课程表：支持手动编辑、文本/截图识别、周视图与日视图。",
+  "author": "Community",
+  "description": "用于记录个人每周课程的轻量课程表：支持手动编辑、文本/DOCX/CSV/HTML/截图识别、周视图与日视图。",
   "icon": "icon.svg",
   "entry": "index.html",
-  "permissions": ["ai", "media.read"],
+  "permissions": ["ai"],
   "chrome": "host"
 }

@@ -20,7 +20,7 @@
 - 分享给角色
 - 外部 CDN 与 DOCX 解析依赖
 
-DOCX 文件请先复制为文本、CSV 或 HTML 后导入。应用不包含外部网络资源，适合教程所述沙盒环境。
+DOCX 可直接选择导入；应用会在本地读取 DOCX 内的 `word/document.xml`，不需要外部脚本。若目标浏览器不支持 `DecompressionStream`，再将 DOCX 另存为 TXT、CSV 或 HTML。应用不包含外部网络资源，也不内置 API key。
 
 ## 文件
 
