@@ -6,6 +6,6 @@
   "description": "用于记录个人每周课程的轻量课程表：支持手动编辑、文本/DOCX/CSV/HTML/截图识别、周视图与日视图。",
   "icon": "icon.svg",
   "entry": "index.html",
-  "permissions": ["ai"],
+  "permissions": ["ai", "calendar.write"],
   "chrome": "host"
 }

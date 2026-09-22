@@ -12,6 +12,8 @@
 - 截图选择、压缩与视觉识别
 - 本地持久化存档
 - 自定义 CSS
+- 多周方案保存与切换
+- 同步到 nuo 原生日历（需要目标环境提供 `nuo.calendar.add` 或 `nuo.calendar.create`）
 
 ## 已移除
 
